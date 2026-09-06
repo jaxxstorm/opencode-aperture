@@ -1,0 +1,118 @@
+name: verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+  workflow_dispatch:
+    inputs:
+      opencode_version:
+        description: OpenCode version to test (defaults to latest)
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  baseline:
+    name: baseline-${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      OPENCODE_EXPECT_VERSION: "1.18.29"
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-14]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.14.0"
+
+      - name: Install pinned npm
+        run: npm install -g npm@11.5.1 --ignore-scripts --registry=https://registry.npmjs.org
+
+      - name: Install pinned OpenCode 1.18.29
+        run: npm install -g "opencode-ai@1.18.29"
+
+      - name: Install pinned Bun 1.3.14
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.14"
+
+      - name: Locked install
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Unit tests
+        run: bun test
+
+      - name: Build
+        run: bun run build
+
+      - name: Package inspection and clean-consumer loading
+        run: bun run test:package
+
+      - name: Packaged routing suite
+        run: bun run test:routing
+
+      - name: Cleanup verification
+        run: bun scripts/verify-probe-cleanup.ts
+
+  canary:
+    name: canary-opencode-${{ inputs.opencode_version || 'latest' }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.14.0"
+
+      - name: Install pinned npm
+        run: npm install -g npm@11.5.1 --ignore-scripts --registry=https://registry.npmjs.org
+
+      - name: Install requested OpenCode and resolve exact version
+        env:
+          OPENCODE_VERSION: ${{ inputs.opencode_version || 'latest' }}
+        run: |
+          npm install -g "opencode-ai@$OPENCODE_VERSION"
+          VERSION=$(opencode --version)
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]
+          printf 'OPENCODE_EXPECT_VERSION=%s\n' "$VERSION" >> "$GITHUB_ENV"
+
+      - name: Install pinned Bun 1.3.14
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.14"
+
+      - name: Locked install
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck and unit tests
+        run: bun run typecheck && bun test
+
+      - name: Build and package checks
+        run: bun run build && bun run test:package
+
+      - name: Packaged routing suite against installed version
+        run: bun run test:routing
+
+      - name: Cleanup verification
+        run: bun scripts/verify-probe-cleanup.ts

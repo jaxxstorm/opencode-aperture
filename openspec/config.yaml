@@ -1,0 +1,186 @@
+version: 1
+
+project:
+  name: "@jaxxstorm/opencode-aperture"
+  type: opencode-plugin
+  language: typescript
+  runtime: bun
+  purpose: >
+    OpenCode plugin that routes ChatGPT Plus/Pro Codex traffic through
+    an Aperture passthrough endpoint while preserving OpenCode-owned OAuth.
+
+paths:
+  project_overview: openspec/project.md
+  specs: openspec/specs
+  changes: openspec/changes
+
+conventions:
+  change_id_format: kebab-case
+  spec_id_format: kebab-case
+  requirement_headings:
+    added: "## ADDED Requirements"
+    modified: "## MODIFIED Requirements"
+    removed: "## REMOVED Requirements"
+  scenario_heading: "#### Scenario:"
+
+workflow:
+  mode: spec_first
+  require_change_for_code_edits: true
+  require_tasks_for_change: true
+  require_design_for:
+    - auth
+    - request-routing
+    - proxying
+    - token-handling
+    - plugin-loader-behavior
+    - logging
+    - config-format
+
+files:
+  required_for_change:
+    - proposal.md
+    - tasks.md
+  optional_for_change:
+    - design.md
+  spec_file_name: spec.md
+
+guardrails:
+  - Do not implement ChatGPT OAuth in this plugin.
+  - Do not read OpenCode auth files directly.
+  - Do not persist OpenAI, ChatGPT, or OpenCode OAuth tokens.
+  - Do not log Authorization headers, access tokens, refresh tokens, or OAuth payloads.
+  - Do not replace OpenCode's native OpenAI auth flow, register auth loaders, or replace fetch.
+  - Setup failures must be non-destructive: report sanitized diagnostics and leave native OpenAI configuration untouched without disabling providers or blocking requests.
+  - Missing or unloadable modules, conflicting auth/fetch/config plugins, and future or untested runtimes are outside the plugin's support scope.
+  - Preserve OpenCode-generated auth headers when routing Codex requests.
+  - "Keep the plugin config-only: configure native OpenAI Responses routing, not identity or transport ownership."
+  - Require a trusted gateway and HTTPS or an explicitly trusted independently protected network.
+  - MIT and the scoped package name are owner-approved; npm scope access and external publishing setup remain unverified. Require separate explicit publication authorization.
+
+rules:
+  proposal:
+    - Keep scope aligned with packaged config-only routing, validated discovery/configuration, native header preservation, safe diagnostics, and compatibility verification.
+    - Include non-goals for OAuth implementation, auth-file access, token persistence, and API-key provider behavior.
+  design:
+    - Document auth ownership, request routing, proxying, token-handling, plugin loader behavior, logging, and config format when those areas are affected.
+  specs:
+    - Describe observable plugin behavior, not implementation details.
+    - Requirements must include at least one scenario.
+  tasks:
+    - Include implementation and test tasks.
+    - Keep tasks scoped to the accepted proposal and specs.
+
+implementation_rules:
+  plugin:
+    source_entrypoint: src/index.ts
+    entrypoint: dist/index.js
+    development_adapter: .opencode/plugins/aperture-codex.ts
+    loading: Exactly one source adapter or built/package registration, including auto-discovery.
+    build_command: bun run build
+    config_file: opencode.json
+    env:
+      aperture_host:
+        precedence:
+          - APERTURE_HOST
+          - OPENCODE_APERTURE_HOST
+        selection: first_nonempty
+        default: http://ai
+        example: https://gateway.example.com
+        validation: HTTP/HTTPS origin only, optional trailing slash; reject credentials, query, fragment, non-root path, malformed URL, and other schemes.
+      debug:
+        name: OPENCODE_APERTURE_DEBUG
+        enabled_value: "1"
+        otherwise: disabled
+
+  routing:
+    provider: openai
+    base_url_path: /codex
+    responses_path: /codex/responses
+    transport: native_oauth_http_sse
+    discovery_path: /api/providers
+    discovery_timeout_ms: 10000
+    discovery_redirects: reject
+    discovery_retries: none
+    eligible_provider: Exactly one valid provider with requires_client_auth and openai_responses true and nonempty model IDs.
+    model_selection: Preserve explicit defaults and user metadata; intersect existing whitelists with ordered unique discovered IDs; fail invalid OpenAI selections or empty intersections.
+    absent_default: first_allowed_discovered_model
+    unsupported:
+      - websockets
+      - residency_sensitive_accounts
+
+  required_header_behavior:
+    preserve:
+      - Authorization
+      - ChatGPT-Account-Id
+      - User-Agent
+      - session-id
+      - originator
+      - Content-Type
+      - Accept
+    never_log:
+      - Authorization
+      - access_token
+      - refresh_token
+      - id_token
+      - account_identifiers
+      - request_headers_and_bodies
+      - raw_discovery_responses
+      - raw_invalid_urls
+
+  failure_behavior:
+    setup_failure: Report a sanitized diagnostic and leave native OpenAI configuration untouched; never disable providers or throw at request time.
+    scope: Supported runtime; unavailable or conflicting plugins and untested upstream versions are outside the plugin's support scope.
+    unrelated_providers: preserve
+    unreachable_aperture: native_openai_routing_unchanged
+    missing_opencode_auth: defer_to_opencode
+    upstream_401_403_429_5xx_or_connection_failure: native_error_and_retry_behavior
+    plugin_load_failure: outside_support_scope
+    discovery_retry: new_opencode_initialization_only
+
+  compatibility:
+    baseline_opencode: "1.18.29"
+    baseline_bun: "1.3.14"
+    baseline_platform: darwin
+    verified_evidence: Release-workflow revision passes locked install, typecheck, 79 tests, build, packaged routing and cleanup, and actionlint on darwin-arm64. Historical live gpt-5.6-luna/gpt-6-astra text is separate. Exact candidate evidence is recorded in openspec/changes/archive/2026-09-05-add-release-workflows/tasks.md.
+    ci_and_canary: pending_execution_evidence
+    native_refresh: unverified
+    live_tests: Explicit trusted-gateway confirmation only, outside CI; natural-expiry refresh evidence without auth-file access or forced expiry.
+
+  release:
+    package_name: "@jaxxstorm/opencode-aperture"
+    candidate_version: "0.1.0"
+    license: MIT
+    copyright: "2026 Lee Briggs"
+    repository: https://github.com/jaxxstorm/opencode-aperture
+    private: false
+    publication: Unpublished; npm scope access, external trust/approval setup, final verification, and explicit publish authorization remain gates.
+    tag: Stable vMAJOR.MINOR.PATCH matching the source-controlled package version.
+    artifact: Verify one tarball via APERTURE_TEST_TARBALL, retain SHA-256, publish unchanged, then attach both to the GitHub release.
+    approval: GitHub npm environment with required reviewers configured externally.
+    identity: GitHub OIDC; npm trusted publisher jaxxstorm/opencode-aperture, release.yml, environment npm, direct publish allowed; no long-lived token fallback.
+    bootstrap_and_recovery: Follow docs/release.md; initial owner-auth publication needs separate authorization, next OIDC release needs a new version, and partial failures reuse original artifacts without republishing or retagging.
+
+validation:
+  before_implementation:
+    - Read openspec/project.md.
+    - Read the relevant spec under openspec/specs.
+    - Create a change under openspec/changes before editing production code.
+
+  before_merge:
+    - All tasks in the active change are checked or explicitly deferred.
+    - Record locked install, typecheck, unit, build/pack, clean-consumer, and packaged routing results with exact versions/platforms; do not claim pending checks passed.
+    - Tests cover native routing/headers, safe diagnostics, completed SSE, tools, cancellation, concurrency, and non-destructive setup failures.
+    - No tests or fixtures contain real tokens.
+    - README documents actual host/debug variables, native login, pinning, restart, migration/removal, and supported-runtime limitations.
+    - Retain historical change artifacts; reconcile active guidance without rewriting history.
+
+agent_instructions:
+  default_mode: spec_first
+  when_asked_to_implement:
+    - Read openspec/config.yaml.
+    - Read openspec/project.md.
+    - Find the relevant change under openspec/changes.
+    - If no change exists, create one before editing production code.
+    - Keep edits scoped to the accepted change.
+    - Update tasks.md as work is completed.
+    - Update specs when behavior changes.
