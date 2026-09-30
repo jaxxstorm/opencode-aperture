@@ -14,6 +14,7 @@ test.each([
   ["license-metadata", "must declare MIT"],
   ["license-text", "approved MIT license"],
   ["version", "differs from source metadata"],
+  ["extra-export", "Unexpected package exports"],
   ["invalid-archive", "failed"],
 ])("supplied candidate: %s, with bounded consumer cleanup", async (scenario, error) => {
   root = await mkdtemp(join(temporaryBase, "aperture-package-fixture-"));
@@ -23,11 +24,14 @@ test.each([
   if (scenario === "private") manifest.private = true;
   if (scenario === "license-metadata") delete manifest.license;
   if (scenario === "version") manifest.version = "999.0.0";
+  if (scenario === "extra-export") manifest.exports["./worker"] = "./dist/bridge-worker.js";
   // This bundle differs from dist/index.js, so a repack of the checkout cannot pass.
   const bundle = 'export default async () => ({ fixture: "supplied-tarball-only" });\n';
   const entries: Record<string, string> = Object.fromEntries(packageFiles.map(file => [file, "fixture documentation\n"]));
   entries["package.json"] = JSON.stringify(manifest);
   entries["dist/index.js"] = bundle;
+  entries["dist/bridge-worker.js"] = 'await import("@jaxxstorm/bun-tailscale-bridge");\n';
+  entries["dist/tui.js"] = 'export default { id: "@jaxxstorm/opencode-aperture", async tui() {} };\n';
   entries.LICENSE = scenario === "license-text" ? "not the approved license" : await Bun.file(join(checkout, "LICENSE")).text();
   if (scenario === "missing-license") delete entries.LICENSE;
   if (scenario === "extra-file") entries["unexpected.txt"] = "not for distribution";

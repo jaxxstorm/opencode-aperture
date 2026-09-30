@@ -12,12 +12,13 @@ const provider = {
 };
 const originalHost = process.env.APERTURE_HOST;
 const originalDebug = process.env.OPENCODE_APERTURE_DEBUG;
+const originalEnable = process.env.OPENCODE_APERTURE_ENABLE;
 let gateway: ReturnType<typeof Bun.serve> | undefined;
 afterEach(() => {
   gateway?.stop(true);
   gateway = undefined;
   mock.restore();
-  for (const [key, value] of [["APERTURE_HOST", originalHost], ["OPENCODE_APERTURE_DEBUG", originalDebug]]) {
+  for (const [key, value] of [["APERTURE_HOST", originalHost], ["OPENCODE_APERTURE_DEBUG", originalDebug], ["OPENCODE_APERTURE_ENABLE", originalEnable]]) {
     if (value === undefined) delete process.env[key!]; else process.env[key!] = value;
   }
 });
@@ -138,8 +139,14 @@ describe("configuration ownership", () => {
 });
 
 describe("plugin hooks and safe failures", () => {
+  test("server plugin is inert unless explicitly enabled", async () => {
+    delete process.env.OPENCODE_APERTURE_ENABLE;
+    expect(await plugin()).toEqual({});
+  });
+
   test("registers hooks without network and leaves native config unchanged on setup failure", async () => {
     process.env.APERTURE_HOST = "http://synthetic-secret@ai";
+    process.env.OPENCODE_APERTURE_ENABLE = "1";
     const fetch = spyOn(globalThis, "fetch");
     const log = spyOn(console, "error").mockImplementation(() => {});
     const hooks = await plugin();
@@ -148,13 +155,13 @@ describe("plugin hooks and safe failures", () => {
     expect(hooks).not.toHaveProperty("shell.env");
     const config: OpenCodeConfig = { disabled_providers: ["other"], provider: { anthropic: { name: "unchanged" } } };
     const before = structuredClone(config);
-    await hooks.config(config);
+    await hooks.config!(config);
     expect(config).toEqual(before);
     expect(config.disabled_providers).toEqual(["other"]);
     const output = { headers: {} };
-    await hooks["chat.headers"](chat(), output);
+    await hooks["chat.headers"]!(chat(), output);
     expect(output.headers).toEqual({});
-    await hooks["chat.headers"](chat("anthropic"), output);
+    await hooks["chat.headers"]!(chat("anthropic"), output);
     expect(output.headers).toEqual({});
     expect(JSON.stringify(log.mock.calls)).not.toContain("synthetic-secret");
     expect(fetch).not.toHaveBeenCalled();
@@ -163,16 +170,17 @@ describe("plugin hooks and safe failures", () => {
   test.each([undefined, "0", "true", "1"])("debug value %s and header scoping", async debug => {
     if (debug === undefined) delete process.env.OPENCODE_APERTURE_DEBUG;
     else process.env.OPENCODE_APERTURE_DEBUG = debug;
+    process.env.OPENCODE_APERTURE_ENABLE = "1";
     process.env.APERTURE_HOST = serve(() => Response.json([provider]));
     const log = spyOn(console, "error").mockImplementation(() => {});
     const hooks = await plugin();
-    await hooks.config({});
+    await hooks.config!({});
     const headers = { Authorization: "Bearer synthetic-secret", "ChatGPT-Account-Id": "synthetic-account", "session-id": "synthetic-session" };
     const output: { headers: Record<string, string> } = { headers: { ...headers } };
-    await hooks["chat.headers"](chat(), output);
+    await hooks["chat.headers"]!(chat(), output);
     expect(output.headers).toEqual({ ...headers, "X-Aperture-OpenCode-Plugin": "1" });
     const other = { headers: { ...headers } };
-    await hooks["chat.headers"](chat("anthropic"), other);
+    await hooks["chat.headers"]!(chat("anthropic"), other);
     expect(other.headers).toEqual(headers);
     expect(log.mock.calls.length > 0).toBe(debug === "1");
     for (const value of Object.values(headers)) expect(JSON.stringify(log.mock.calls)).not.toContain(value);
@@ -180,16 +188,17 @@ describe("plugin hooks and safe failures", () => {
 
   test("malformed discovery cannot leak secret data or mutate native config", async () => {
     process.env.OPENCODE_APERTURE_DEBUG = "1";
+    process.env.OPENCODE_APERTURE_ENABLE = "1";
     process.env.APERTURE_HOST = serve(() => Response.json([{ id: "synthetic-secret" }]));
     const log = spyOn(console, "error").mockImplementation(() => {});
     const hooks = await plugin();
     const config: OpenCodeConfig = { model: "openai/gpt-5.5" };
     const before = structuredClone(config);
-    await hooks.config(config);
+    await hooks.config!(config);
     expect(config).toEqual(before);
     expect(config.disabled_providers).toBeUndefined();
     const output = { headers: {} };
-    await hooks["chat.headers"](chat(), output);
+    await hooks["chat.headers"]!(chat(), output);
     expect(output.headers).toEqual({});
     expect(JSON.stringify(log.mock.calls)).not.toContain("synthetic-secret");
   });

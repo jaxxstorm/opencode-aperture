@@ -51,15 +51,19 @@ guardrails:
   - Do not log Authorization headers, access tokens, refresh tokens, or OAuth payloads.
   - Do not replace OpenCode's native OpenAI auth flow, register auth loaders, or replace fetch.
   - Setup failures must be non-destructive: report sanitized diagnostics and leave native OpenAI configuration untouched without disabling providers or blocking requests.
-  - Missing or unloadable modules, conflicting auth/fetch/config plugins, and future or untested runtimes are outside the plugin's support scope.
+  - Missing or unloadable root plugins, conflicting auth/fetch/config plugins, and future or untested runtimes are outside support scope; optional bridge absence is tolerated while disabled and a sanitized enabled-setup failure.
   - Preserve OpenCode-generated auth headers when routing Codex requests.
-  - "Keep the plugin config-only: configure native OpenAI Responses routing, not identity or transport ownership."
-  - Require a trusted gateway and HTTPS or an explicitly trusted independently protected network.
+  - "Keep bridge-disabled routing config-only. The authorized add-optional-tailscale-bridge change alone permits independent Tailscale state, private local TUI enrollment, parent-owned ingress and separate-worker fixed-gateway transport; never native ChatGPT identity ownership."
+  - "Bridge production implementation is owner-authorized; support remains evidence-gated. Retain historical narrow authorizations and NO-GOs, not as current implementation prohibitions."
+  - "Native-facing ingress is one shared parent-owned numeric-loopback raw HTTP port retained until parent exit and unref'ed; per-instance capability routes are removed on disposal. Workers listen only on Unix sockets in parent-created short owner-only 0700 directories."
+  - "Parent forwards HTTP with node:http over the private Unix socket; only the exact verified Bun 1.4.2 child performs HTTPS through the bridge proxy. Never embedded-parent CONNECT, native fetch replacement, runtime fallback, or stale-port reuse. Same-user/root compromise is out of scope."
+  - "Enrollment keys may be resolved only from an explicit authKeyEnv reference and passed privately, never inherited into children or persisted. Browser URLs appear only in private local TUI DialogAlert; no unmasked key prompts or model tools."
+  - Require a trusted gateway; enabled bridge requires HTTPS, while ordinary disabled routing also permits an explicitly trusted independently protected HTTP network.
   - MIT and the scoped package name are owner-approved; npm scope access and external publishing setup remain unverified. Require separate explicit publication authorization.
 
 rules:
   proposal:
-    - Keep scope aligned with packaged config-only routing, validated discovery/configuration, native header preservation, safe diagnostics, and compatibility verification.
+    - Keep scope aligned with ordinary config-only routing and the authorized optional bridge exception, validated discovery/configuration, native header preservation, safe diagnostics, and compatibility verification.
     - Include non-goals for OAuth implementation, auth-file access, token persistence, and API-key provider behavior.
   design:
     - Document auth ownership, request routing, proxying, token-handling, plugin loader behavior, logging, and config format when those areas are affected.
@@ -74,12 +78,16 @@ implementation_rules:
   plugin:
     source_entrypoint: src/index.ts
     entrypoint: dist/index.js
+    bridge_worker_entrypoint: dist/bridge-worker.js
+    optional_tui_subpath: dist/tui.js
+    root_export: Exactly one default server plugin function; TUI is a separate optional subpath, not another root factory.
     development_adapter: .opencode/plugins/aperture-codex.ts
     loading: Exactly one source adapter or built/package registration, including auto-discovery.
     build_command: bun run build
     config_file: opencode.json
     env:
       aperture_host:
+        scope: Ordinary bridge-disabled routing; enabled bridge uses explicit HTTPS bridge.gateway from shared local settings.
         precedence:
           - APERTURE_HOST
           - OPENCODE_APERTURE_HOST
@@ -128,14 +136,31 @@ implementation_rules:
       - raw_invalid_urls
 
   failure_behavior:
-    setup_failure: Report a sanitized diagnostic and leave native OpenAI configuration untouched; never disable providers or throw at request time.
+    setup_failure: Report a sanitized diagnostic and leave native OpenAI configuration untouched; never disable providers or add request guards before activation.
+    active_bridge_failure: Abort upstream work, invalidate instance route and proxy secrets, reject with 503 or close in-flight work then 403 for removed capabilities; retain parent ingress until parent exit, with no direct fallback.
     scope: Supported runtime; unavailable or conflicting plugins and untested upstream versions are outside the plugin's support scope.
     unrelated_providers: preserve
-    unreachable_aperture: native_openai_routing_unchanged
+    unreachable_aperture: During setup leave native configuration unchanged; after bridge activation retain guarded route without direct fallback.
     missing_opencode_auth: defer_to_opencode
     upstream_401_403_429_5xx_or_connection_failure: native_error_and_retry_behavior
     plugin_load_failure: outside_support_scope
     discovery_retry: new_opencode_initialization_only
+
+  bridge:
+    authorization: Full production feature authorized; this reconciliation edits OpenSpec only, not code/packages/docs. Implementation and support require recorded verification.
+    settings: ${XDG_CONFIG_HOME:-~/.config}/opencode-aperture/settings.json
+    settings_scope: Shared local per-user version-1 file for local TUI/server only; remote server attachment/setup unsupported, no assumed RPC.
+    fields: "bridge: { enabled, gateway, hostname, stateDir, runtime: { mode, executable? }, modulePath?, authKeyEnv?, startupTimeoutMs }"
+    gateway: Explicit trusted HTTPS origin only when enabled; preserve existing environment precedence for bridge-disabled routing.
+    paths: stateDir is absolute private owned state outside project/package trees; modulePath is an optional absolute trusted separately installed JavaScript entry, never runtime compilation.
+    timeout: Default 60000 ms; integer range 1-300000 ms; discovery retains independent 10000 ms limit.
+    runtime: External default, explicit absolute executable or PATH-resolved once; actual Bun allowlist exactly 1.4.2. Embedded future mode uses same worker via process.execPath with child-only BUN_BE_BUN after verification, never automatic fallback.
+    commands: /aperture-setup, /aperture-status, /aperture-disconnect, /aperture-forget via private local TUI dialogs, not model tools.
+    disconnect: Save enabled false and require full OpenCode restart; no assumed live server RPC or dynamic direct rerouting.
+    forget: Confirm stopped profile and acquire exclusive lock with matching owner marker and safe ownership/path/symlink checks; refuse arbitrary deletion or active lock takeover.
+    dependency: Exact optional @jaxxstorm/bun-tailscale-bridge 0.1.0; tolerate unavailable optional resolution while disabled, test separately installed local tarball via modulePath; never commit developer file dependencies.
+    evidence: Inspected local checksum and metadata only; npm E404, no GitHub releases, zero-commit provenance unverified. Native helper execution and production feature verification pending; no publication/download/compilation or live enrollment authorized.
+    tests: Full feature uses fake bridge modules exclusively against loopback; real artifact import/helper launch-protocol checks only without enrollment, never infer live success.
 
   compatibility:
     baseline_opencode: "1.18.29"

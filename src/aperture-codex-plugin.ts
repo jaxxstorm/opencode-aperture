@@ -36,11 +36,14 @@ export function apertureURL(host: string, path: string): string {
   return new URL(path, host).toString().replace(/\/$/, "");
 }
 
-export async function fetchApertureProviders(host: string): Promise<ProviderInfo[]> {
+export async function fetchApertureProviders(
+  host: string,
+  request: (input: string | URL | Request, init?: RequestInit) => Promise<Response> = fetch,
+): Promise<ProviderInfo[]> {
   const signal = AbortSignal.timeout(10000);
   let response: Response;
   try {
-    response = await fetch(apertureURL(apertureHost({ APERTURE_HOST: host }), "/api/providers"), { signal, redirect: "error" });
+    response = await request(apertureURL(apertureHost({ APERTURE_HOST: host }), "/api/providers"), { signal, redirect: "error" });
   } catch (error) {
     if (error instanceof ApertureSetupError) throw error;
     throw new ApertureSetupError(signal.aborted ? "provider discovery timed out after 10 seconds" : "provider discovery failed: check gateway connectivity and redirects");

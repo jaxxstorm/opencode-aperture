@@ -2,9 +2,10 @@ import { copyFile, mkdtemp, mkdir, rm, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import assert from "node:assert/strict";
+import { isBuiltin } from "node:module";
 
 export const packageName = "@jaxxstorm/opencode-aperture";
-export const packageFiles = ["LICENSE", "README.md", "dist/index.js", "docs/compatibility.md", "docs/live-validation.md", "docs/release.md", "docs/verification.md", "package.json"];
+export const packageFiles = ["LICENSE", "README.md", "dist/bridge-worker.js", "dist/index.js", "dist/tui.js", "docs/compatibility.md", "docs/live-validation.md", "docs/release.md", "docs/verification.md", "package.json"];
 export const checkout = resolve(import.meta.dir, "..");
 export const temporaryBase = process.env.APERTURE_TEST_TMPDIR ?? tmpdir();
 
@@ -41,7 +42,9 @@ export async function consumer(tarball = process.env.APERTURE_TEST_TARBALL) {
       tarball = join(root, "packed/candidate.tgz");
       await copyFile(supplied, tarball);
     } else {
-      assert(await Bun.file(join(checkout, "dist/index.js")).exists(), "Build dist/index.js before verification");
+      for (const file of packageFiles.filter(file => file.startsWith("dist/"))) {
+        assert(await Bun.file(join(checkout, file)).exists(), `Build ${file} before verification`);
+      }
       const packed = JSON.parse(await command(["npm", "pack", "--json", "--ignore-scripts", "--pack-destination", join(root, "packed")], checkout, isolatedEnv(root)));
       assert.equal(packed.length, 1);
       tarball = join(root, "packed", packed[0].filename);
@@ -55,21 +58,40 @@ export async function consumer(tarball = process.env.APERTURE_TEST_TARBALL) {
     assert.equal(manifest.version, (await Bun.file(join(checkout, "package.json")).json()).version, "Candidate version differs from source metadata");
     assert.notEqual(manifest.private, true, "Release package must not be private");
     assert.equal(manifest.license, "MIT", "Release package must declare MIT");
-    assert.deepEqual([...manifest.files].sort(), ["LICENSE", "README.md", "dist/index.js", "docs/"]);
+    assert.deepEqual(manifest.files, ["dist/index.js", "dist/bridge-worker.js", "dist/tui.js", "LICENSE", "README.md", "docs/"]);
     const license = await command(["tar", "-xOf", tarball!, "package/LICENSE"], root, isolatedEnv(root));
     assert.equal(license, await Bun.file(join(checkout, "LICENSE")).text(), "Candidate must include the approved MIT license");
     assert.equal(manifest.main.replace(/^\.\//, ""), "dist/index.js");
-    const entry = typeof manifest.exports === "string" ? manifest.exports : manifest.exports["."];
-    assert.equal(entry.replace(/^\.\//, ""), "dist/index.js");
-    assert.equal(Object.keys(manifest.dependencies ?? {}).length, 0, "Distribution must be self-contained");
+    assert.deepEqual(manifest.exports, { ".": "./dist/index.js", "./server": "./dist/index.js", "./tui": "./dist/tui.js" }, "Unexpected package exports");
+    for (const field of ["dependencies", "optionalDependencies", "peerDependencies"]) {
+      assert.equal(Object.keys(manifest[field] ?? {}).length, 0, "Distribution must not declare runtime dependencies");
+    }
     await Bun.write(join(root, "work/package.json"), JSON.stringify({ private: true, type: "module" }));
     await command(["npm", "install", "--ignore-scripts", "--omit=dev", "--no-audit", "--no-fund", tarball!], join(root, "work"), isolatedEnv(root));
     const installed = join(root, "work/node_modules", packageName);
     assert((await realpath(installed)).startsWith(root));
-    const imports = new Bun.Transpiler({ loader: "js" }).scanImports(await Bun.file(join(installed, "dist/index.js")).text());
-    assert.equal(imports.length, 0, "Self-contained factory must not resolve runtime imports");
+    for (const file of new Set([...Object.values(manifest.exports) as string[], "./dist/bridge-worker.js"])) {
+      assert(await Bun.file(join(installed, file)).exists(), `Missing runtime entry: ${file}`);
+      const code = await Bun.file(join(installed, file)).text();
+      const transpiler = new Bun.Transpiler({ loader: "js" });
+      transpiler.transformSync(code);
+      for (const entry of transpiler.scanImports(code)) {
+        // Bun may normalize node: imports to equivalent bare builtin specifiers.
+        assert(isBuiltin(entry.path)
+          || (file === "./dist/bridge-worker.js" && entry.kind === "dynamic-import" && entry.path === "@jaxxstorm/bun-tailscale-bridge"),
+        `Unexpected runtime import in ${file}: ${entry.path}`);
+      }
+      // scanImports cannot see import(expressions). The worker's modulePath is
+      // an explicit user-trusted absolute JS path, validated by runtime settings.
+    }
     // A separate process has neither checkout-relative resolution nor NODE_PATH.
-    await command([process.execPath, "--eval", `const m = await import('${packageName}'); if (Object.keys(m).join() !== 'default' || typeof m.default !== 'function') process.exit(1)`], join(root, "work"), isolatedEnv(root));
+    await command([process.execPath, "--eval", `
+      const m = await import('${packageName}');
+      if (Object.keys(m).join() !== 'default' || typeof m.default !== 'function') process.exit(1);
+      if ((await import('${packageName}/server')).default !== m.default) process.exit(1);
+      const t = await import('${packageName}/tui');
+      if (Object.keys(t).join() !== 'default' || t.default?.id !== '${packageName}' || typeof t.default?.tui !== 'function') process.exit(1);
+    `], join(root, "work"), isolatedEnv(root));
     return { root, installed, files };
   } catch (error) {
     await rm(root, { recursive: true, force: true });

@@ -12,13 +12,17 @@
     "registry": "https://registry.npmjs.org"
   },
   "type": "module",
-  "description": "Route OpenCode native ChatGPT subscription requests through a trusted Aperture gateway",
+  "description": "Discover Aperture providers in OpenCode with gateway-managed authentication and explicit credential forwarding",
   "main": "./dist/index.js",
-  "exports": "./dist/index.js",
-  "files": ["dist/index.js", "LICENSE", "README.md", "docs/"],
+  "exports": {
+    ".": "./dist/index.js",
+    "./server": "./dist/index.js",
+    "./tui": "./dist/tui.js"
+  },
+  "files": ["dist/index.js", "dist/bridge-worker.js", "dist/tui.js", "LICENSE", "README.md", "docs/"],
   "scripts": {
     "test": "bun test",
-    "build": "bun build ./src/index.ts --target bun --outdir ./dist",
+    "build": "bun build ./src/index.ts ./src/bridge-worker.ts ./src/tui.ts --target bun --outdir dist --external @jaxxstorm/bun-tailscale-bridge",
     "pack": "bun run build && npm pack --ignore-scripts",
     "test:package": "bun scripts/verify-package.ts",
     "test:routing": "bun scripts/probe-routing.ts",

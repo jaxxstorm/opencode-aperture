@@ -1,8 +1,38 @@
 # Compatibility and Evidence
 
-Status: owner-approved `@jaxxstorm/opencode-aperture@0.1.0`, prepared for public distribution under MIT (copyright 2026 Lee Briggs), **unpublished**. Local release-workflow revision checks pass on darwin-arm64. Ubuntu/macOS CI, npm scope access, and external publishing setup are not verified.
+Status: owner-approved `@jaxxstorm/opencode-aperture@0.1.0`, under MIT (copyright 2026 Lee Briggs), **unpublished**. Final source-built three-entry bridge/TUI results are recorded below, separately from historical direct-routing evidence. Ubuntu/macOS CI, npm scope access, and external publishing setup are not verified.
+
+## Bridge Candidate
+
+- Server root and `/server`: single default callable factory at `dist/index.js`. `/tui`: separate default `{ id, tui }` module at `dist/tui.js`. `dist/bridge-worker.js` is an internal independently built worker, not an export. All three ship together, without fixtures or development code.
+- The worker requires external Bun **1.4.2**, selected by an absolute executable or resolved from `PATH`. It checks the version in the actual spawned worker process. OpenCode's currently embedded runtime is rejected. Explicit OpenCode-executable mode is only a future option after that exact runtime is verified, not a fallback. Nothing auto-downloads or upgrades a runtime or bridge.
+- `@jaxxstorm/bun-tailscale-bridge` is an external dynamic import, not a bundled dependency. Registry inspection returned **npm E404** and no GitHub release; no guessed `optionalDependencies` version is declared. Until registry release, install a trusted local tarball in a private per-user runtime and configure its absolute `modulePath` as described in the [README](../README.md).
+- The inspected local bridge 0.1.0 tarball SHA-256 is `a8c6f8d626cc99bb0160f66b848b41d3dc1dd640295bf302e9697067bbac2ab6`. It contains four executable helper entries (darwin-arm64, darwin-x64, linux-arm64, linux-x64), MIT license, and third-party notices. Release metadata has a zero commit, so source provenance is unverified. Archive inspection is not native helper execution or a platform support claim.
+- Production setup uses HTTPS and local-only TUI dialogs. The public `https://opencode.ai/tui.json` schema was checked for its top-level `plugin` array. Registration belongs in both `opencode.json` and `tui.json`; TUI API/source inspection alone is not interactive end-to-end validation.
+- Full-feature tests use fake bridge modules and loopback traffic. Real bridge import/helper protocol checks, when recorded, must be distinguished from enrollment. **No live bridge enrollment or live tailnet routing is verified here.** Native OpenAI OAuth remains independent.
+- The configured bridge route uses a parent-owned listener and a private Unix worker socket. Worker death retains the mapping with `503`; instance disposal removes the mapping (`403`) while the listener stays bound for the parent process lifetime. This is a local route guard, not system-wide egress enforcement. Same-user/root attackers are out of scope.
+
+## Final Production Results
+
+Reported on darwin-arm64 with stock OpenCode **1.18.29**, embedded Bun **1.3.14**, and external worker Bun **1.4.2**; these results have not been rerun by this documentation update:
+
+| Check | Known result and boundary |
+| --- | --- |
+| Installed `bun scripts/probe-routing.ts --bridge-production` | All five HTTPS scenarios passed: text SSE, tools, concurrency, cancellation, unrelated-provider isolation. Installed index, parent guard, and worker are real; only the bridge module is fake. Exactly one proxied discovery precedes atomic activation. |
+| `bun run test:package` | Passed all three built entries and clean-consumer loading. Bun's builtin-prefix normalization is handled with `isBuiltin`, not an arbitrary-import exception. |
+| Final `bun test`, after continuous state lease and shared runtime pool wiring | 200 pass, 0 fail, 922 expectations across 12 files. |
+| `bun install --frozen-lockfile`; `bun run typecheck`; `bun run build` | Locked install: no changes, 32 installs / 38 packages; typecheck passed; build: three entries, eight modules, index 40.89 KB, worker 36.68 KB, TUI 34.22 KB. |
+| Installed `bun scripts/probe-routing.ts --bridge-production-errors` | 429 native retry passed with two gateway requests; 307 containment passed with one gateway request and zero redirect-sink requests; untrusted fixture CA rejected with zero inference gateway requests. Negative prompts were still pending at 500 ms and parent-aborted: no completed negative-error UX claim. |
+| Default native probe; cleanup verifier; embedded ingress units | All five default scenarios passed; both failure/interruption cleanup scenarios passed; embedded Bun 1.3.14 ingress units: eight pass, 79 expectations. |
+| Production worker/guard, runtime, settings and mocked TUI units | Focused coverage includes shared runtime references, per-instance capabilities, retained TCP port, failure `503`/revoked `403`, private Unix endpoints, locked settings writes, state safety and local commands. Real interactive browser enrollment was not run. |
+| Real bridge artifact, isolated offline/script-free install and import | Imported exported `createBridge` and `BridgeError` without calling `createBridge`; sandbox environment empty, network denied. |
+| Real darwin-arm64 helper, fresh HOME, deny-all-network sandbox | Deliberately incompatible protocol `999` returned `PROTOCOL_ERROR`, exit 1, no timeout or stderr. This verifies bounded launch/protocol rejection only, not enrollment or live routing. |
+
+The fake bridge uses a real HTTP proxy fixture. Its test-only module wraps worker-global fetch to assert the correct worker-supplied proxy and fixed upstream, then add a per-request fixture CA; there is no parent/native auth-fetch replacement or production source patch. The production worker retains real bridge imports and user-trusted `modulePath` loading. The native sandbox allows localhost TCP and only the specific private `apb.../s` Unix socket paths, not external networking; fixture state lives under its own `0700` parent. Each native probe cleanup reported TCP-refused listeners, removed storage and stopped children. See [verification](verification.md) and the active change evidence for deferred verification.
 
 ## Exact Baseline
+
+The following is historical evidence for the earlier direct-only artifact, not the new three-entry candidate. In particular, the old zero-runtime-import assertion has been replaced by an explicit import allowlist: `node:*` builtins in every bundle and the sole external dynamic bridge package import in the worker. Computed `modulePath` loading requires explicit user trust and runtime path validation; a static scanner cannot prove its target safe.
 
 | OpenCode | Bun | Platform | Artifact / check | Evidence |
 | --- | --- | --- | --- | --- |
@@ -22,11 +52,12 @@ The original live text checks did not independently inspect gateway-side request
 
 ## Coverage Limits
 
+- Deferred verification includes real interactive TUI/browser behavior, transcript/telemetry secrecy, exhaustive raw-wire variations, bounded-memory/backpressure stress, actual cross-UID replacement/race attacks, the remaining optional/helper/platform matrix, and completed native negative-error UX. Guard permissions/architecture and embedded ingress units are evidence, not an actual cross-UID attack test. Implementation is complete; these are not code or authorization blockers.
 - Native OAuth login, header injection, and HTTP/SSE routing are the architecture; native refresh through this gateway and refreshed-token persistence remain **unverified**.
 - Live tools, gateway-correlated live text/tools, live cancellation, and live concurrent-session behavior are **unverified**. Synthetic coverage above is separate from live behavior.
 - WebSocket transport is **unsupported** and must remain disabled in verification.
 - Residency-sensitive accounts are **unsupported**: native residency headers are currently added inside the rewrite branch this route avoids. Do not synthesize headers or infer residency guarantees.
-- The plugin reports sanitized setup errors but does not disable providers or block requests. OpenCode may ignore those errors and retain native routing; check logs and restart after fixing configuration.
+- Initial setup failure reports sanitized errors and leaves native provider configuration unchanged. Native routing may remain available. After successful bridge configuration, the retained local route guard denies requests when its worker dies; it does not turn initial loading failure into a fail-closed guarantee. Check logs and restart after fixing configuration.
 - Missing/unloadable modules, conflicting OpenAI auth/fetch/config plugins, future versions, and untested platforms are outside the verified boundary.
 
 ## Recording New Evidence
