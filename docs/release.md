@@ -1,6 +1,6 @@
 # Releases
 
-`@jaxxstorm/opencode-aperture@0.1.0` is prepared for public npm distribution under MIT, copyright 2026 Lee Briggs, but is **unpublished**. The name and license are owner-confirmed; plugin publishing access is not checked. The owner has published `@jaxxstorm/bun-tailscale-bridge@0.1.0`; its registry-confirmed Bun engine requirement is `1.4.2`. Earlier local results are historical, not verification of this release-readiness revision. No plugin tag, publication, release, or account-setting change has been performed by this work. CI execution and real plugin publishing remain unverified.
+Release reference, not onboarding: start with [How to Use](how-to-use.md). The current npm release is **`@jaxxstorm/opencode-aperture@0.1.4` (published)**, under MIT, copyright 2026 Lee Briggs. The optional bridge `@jaxxstorm/bun-tailscale-bridge@0.1.0` is also published and requires Bun `1.4.2`. Earlier unpublished 0.1.0 candidate status and local test results are historical, not the current publication status or verification of a new release. Recheck approval and publishing prerequisites for each release.
 
 ## Owner Setup
 
@@ -13,27 +13,28 @@ Complete these external prerequisites before authorizing a release. Workflow YAM
 
 See [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/) for current service prerequisites. Repository visibility, environment protections, npm ownership, and allowed publisher actions must be checked by the owner; none is confirmed by local tests.
 
-## First Publication
+## Historical Bootstrap
 
-If the package does not yet exist and npm cannot expose its trusted-publisher settings, an owner-authenticated initial publication may be necessary. This is a separate, explicitly authorized bootstrap action, not a token fallback in CI.
+The package already exists; do not repeat bootstrap for the current package. This reference applies only if a new package does not yet exist and npm cannot expose its trusted-publisher settings. An owner-authenticated initial publication is a separate, explicitly authorized action, not a token fallback in CI.
 
 1. Finish candidate verification below and obtain owner authorization for the **exact tested tarball and checksum**, public name, and version. Use the retained workflow candidate if available; never replace tested bytes by publishing the checkout.
-2. Only after authorization, the owner authenticates locally using npm's supported interactive login/2FA and publishes that file with `npm publish /absolute/path/to/jaxxstorm-opencode-aperture-0.1.0.tgz --access public --ignore-scripts --registry=https://registry.npmjs.org`. This is a real publish command, not a verification step. Local bootstrap does not establish GitHub OIDC provenance; do not claim that it does.
+2. Only after authorization, the owner authenticates locally using npm's supported interactive login/2FA and publishes that file with `npm publish /absolute/path/to/verified-candidate.tgz --access public --ignore-scripts --registry=https://registry.npmjs.org`. Replace the path with the exact approved artifact. This is a real publish command, not a verification step. Local bootstrap does not establish GitHub OIDC provenance; do not claim that it does.
 3. Verify registry integrity against the tested file, then configure npm trust as above. If a matching tag does not exist, separately authorize creating it at the tested commit. Do not approve an automated attempt to publish the already-published version. Complete the first GitHub release manually with that exact tag, tarball, and checksum using the recovery procedure below.
-4. The next automated release needs a **new package version and matching new tag**. Retrying `v0.1.0` after a bootstrap publication of `0.1.0` fails the existing-version check; it is not an OIDC migration test.
+4. The next automated release needs a **new package version and matching new tag**. Retrying a bootstrap-published version fails the existing-version check; it is not an OIDC migration test.
 
 ## Release Procedure
 
 ### Automated Preparation
 
-Commit the release script and any feature changes first: preparation requires a clean worktree and an `origin` remote. Use external Bun 1.4.2. Choose a new stable package version; never reuse a failed or published tag.
+Commit the release script and any feature changes first: preparation requires a clean worktree and an `origin` remote. Use external Bun 1.4.2. Set `RELEASE_VERSION` to a chosen stable version greater than the manifest version, unused in npm and local/remote tags. Never reuse a failed or published tag; no specific next version is assumed available.
 
 ```sh
 # Read-only preflight: checks local/remote tags and npm availability.
-bun run release -- 0.1.2 --dry-run
+: "${RELEASE_VERSION:?Set RELEASE_VERSION to a new unused stable version}"
+bun run release -- "$RELEASE_VERSION" --dry-run
 
 # Bump, verify, commit, tag, and atomically push to trigger release.yml.
-bun run release -- 0.1.2 --commit --push
+bun run release -- "$RELEASE_VERSION" --commit --push
 ```
 
 The command updates only this plugin's package version, runs `bun install --ignore-scripts`, typecheck, unit tests, build, and clean-consumer package verification. The bridge dependency version stays unchanged. Before tagging, it verifies that the committed manifest matches the requested version. The push sends only the current branch and requested tag; it never force-pushes or publishes directly to npm. GitHub Actions performs the full routing checks and approval-gated publication.
@@ -58,7 +59,7 @@ The Ubuntu/macOS baseline uses external Bun 1.4.2 for locked install, typecheck,
 
 Workflow wiring is not execution evidence. Main-workstream package/guard changes and their reported verification, successful hosted baseline/candidate runs, and owner approval/OIDC setup remain release prerequisites. Unit tests that require `APERTURE_SDK_TEST_DIR` are not enabled by these workflows; historical SDK-enabled unit counts must not be attributed to CI.
 
-Local release-readiness checks pass: 363 tests with pinned SDK probes enabled, typecheck, build, workflow lint, and clean-consumer checks both including and omitting the published bridge. The manifest and lockfile pin bridge 0.1.0, the toolchain uses Bun 1.4.2, and server/TUI activation needs no environment flag. Published-package verification checks import, matching helper binary metadata and worker resolution without starting a real helper. Hosted CI execution and owner approval/OIDC setup remain unverified.
+Historical local release-readiness checks passed: 363 tests with pinned SDK probes enabled, typecheck, build, workflow lint, and clean-consumer checks both including and omitting the published bridge. The manifest and lockfile pinned bridge 0.1.0, the toolchain used Bun 1.4.2, and server/TUI activation needed no environment flag. Published-package verification checked import, matching helper binary metadata and worker resolution without starting a real helper. Those checks did not verify hosted CI execution or owner approval/OIDC setup and are not a fresh 0.1.4 validation.
 
 ## Recovery
 

@@ -5,7 +5,13 @@ import assert from "node:assert/strict";
 import { isBuiltin } from "node:module";
 
 export const packageName = "@jaxxstorm/opencode-aperture";
-export const packageFiles = ["LICENSE", "README.md", "dist/bridge-worker.js", "dist/index.js", "dist/tui.js", "docs/compatibility.md", "docs/live-validation.md", "docs/release.md", "docs/verification.md", "package.json"];
+export const packageFiles = [
+  "LICENSE", "README.md", "dist/bridge-worker.js", "dist/index.js", "dist/tui.js",
+  "docs/.nojekyll", "docs/README.md", "docs/_404.md", "docs/_sidebar.md", "docs/build.md",
+  "docs/compatibility.md", "docs/configuration.md", "docs/how-to-use.md", "docs/index.html",
+  "docs/live-validation.md", "docs/release.md", "docs/run-locally.md", "docs/troubleshooting.md",
+  "docs/verification.md", "package.json",
+];
 export const checkout = resolve(import.meta.dir, "..");
 export const temporaryBase = process.env.APERTURE_TEST_TMPDIR ?? tmpdir();
 

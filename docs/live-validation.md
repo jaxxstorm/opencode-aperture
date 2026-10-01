@@ -1,5 +1,7 @@
 # Opt-In Live Validation
 
+Reference procedure, not onboarding: start with [How to Use](how-to-use.md) and [configuration](configuration.md). The current npm release is **`@jaxxstorm/opencode-aperture@0.1.4` (published)**; dated evidence below is historical, not a live-validation claim for that release.
+
 Live testing is optional, sends real subscription credentials to the gateway, and never belongs in automatic CI. The existing September 5, 2026 text evidence for `gpt-5.6-luna` and `gpt-6-astra` is recorded in [compatibility](compatibility.md); it does not verify tools, gateway-log correlation, or refresh.
 
 ## Authorization Gate
@@ -10,7 +12,7 @@ Use HTTPS or an explicitly trusted independently protected network. Confirm the 
 
 ## Preparation
 
-1. Record the candidate artifact/checksum, exact OpenCode/Bun versions and platform. Start with stock OpenCode 1.18.29 and Bun 1.3.14; existing evidence is darwin only.
+1. Record the candidate artifact/checksum, exact OpenCode/Bun versions and platform. Use stock OpenCode 1.18.29 and external Bun 1.4.2; the host's embedded Bun 1.3.14 is separate. Existing live evidence is darwin only.
 2. Use exactly one plugin installation, without conflicting auth/fetch/config plugins. Explicitly keep experimental WebSockets disabled. Do not use a residency-sensitive account.
 3. Set the confirmed gateway origin and restart OpenCode. Use `opencode auth login` with OpenAI's native subscription/browser flow if login is needed. Do not use an API key or a plugin-owned login.
 4. Never read, copy, inspect, export, or edit auth files. Do not expose tokens, account identifiers, OAuth payloads, or raw logs. Do not change credential timestamps or force expiration.

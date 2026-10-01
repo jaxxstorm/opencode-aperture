@@ -1,6 +1,8 @@
 # Compatibility and Evidence
 
-Status: owner-approved `@jaxxstorm/opencode-aperture@0.1.0`, under MIT (copyright 2026 Lee Briggs), **unpublished**. The bridge `@jaxxstorm/bun-tailscale-bridge@0.1.0` is owner-published with registry-confirmed Bun engine requirement `1.4.2`. Previously reported source-built three-entry bridge/TUI results are recorded below, separately from earlier direct-routing evidence. Local release-readiness tests, typecheck, build, workflow lint and clean-consumer checks pass. Ubuntu/macOS hosted CI, plugin publishing access, and external publishing setup are not verified.
+Reference evidence, not onboarding: start with [How to Use](how-to-use.md) and [configuration](configuration.md). The current npm release is **`@jaxxstorm/opencode-aperture@0.1.4` (published)**. Results and pending checks below describe their historical artifacts, not a fresh verification of 0.1.4.
+
+Historical status: the owner-approved `@jaxxstorm/opencode-aperture@0.1.0` candidate, under MIT (copyright 2026 Lee Briggs), was unpublished at the time of these checks. The bridge `@jaxxstorm/bun-tailscale-bridge@0.1.0` was owner-published with registry-confirmed Bun engine requirement `1.4.2`. Previously reported source-built three-entry bridge/TUI results are recorded below, separately from earlier direct-routing evidence. Local release-readiness tests, typecheck, build, workflow lint and clean-consumer checks passed. Ubuntu/macOS hosted CI, plugin publishing access, and external publishing setup were not verified by those checks.
 
 ## Bridge Candidate
 

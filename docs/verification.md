@@ -1,5 +1,7 @@
 # Developer Verification
 
+Reference checks and historical evidence, not onboarding: start with [How to Use](how-to-use.md) or [Build from source](build.md). The current npm release is **`@jaxxstorm/opencode-aperture@0.1.4` (published)**. Recorded counts, pending checks, and non-publication statements below refer to their historical runs, not a new verification of 0.1.4.
+
 The release build/test harness and external bridge worker use **Bun 1.4.2**, with stock **OpenCode 1.18.29**. OpenCode's embedded Bun is separate; historical direct-routing checks used embedded Bun **1.3.14**. Run from a source checkout:
 
 ```sh
@@ -35,7 +37,7 @@ The earlier builtin-prefix packaging failure is resolved: `isBuiltin` recognizes
 Ordinary local checks pack from the checkout. To test one candidate without repacking, build once as above, then pack once with `npm pack --ignore-scripts` and use the resulting file for all three checks:
 
 ```sh
-export APERTURE_TEST_TARBALL="$PWD/jaxxstorm-opencode-aperture-0.1.0.tgz"
+export APERTURE_TEST_TARBALL="/absolute/path/to/verified-candidate.tgz"
 bun run test:package
 bun run test:routing
 bun scripts/verify-probe-cleanup.ts
@@ -56,11 +58,11 @@ Historical direct-routing checks are functional verification, not network enforc
 
 Keep fake-module loopback checks separate from real bridge artifact import/helper launch-protocol checks. Neither proves live enrollment, tailnet access, or inference. Do not run live enrollment implicitly or inspect native user credentials. The inspected local artifact checksum and unverified provenance are recorded in [compatibility](compatibility.md).
 
-Check TUI setup using both registrations in the [README](../README.md): `/aperture-setup`, `/aperture-status`, and `/aperture-disconnect` operate only locally. Validate browser-link cancellation, environment-variable-name-only enrollment, private `600` settings and `700` identity storage, and restart semantics. Setup has no state-path prompt. `/aperture-forget` must require disabled saved settings, confirmation, and a private plugin-owned unlocked profile, retain disabled settings, refuse unsafe deletion, and leave native auth and remote device revocation untouched. Environment host overrides must still take precedence over the saved HTTPS gateway. TUI tests and package imports do not by themselves prove OpenCode interactive loading.
+Check TUI setup using both registrations in [How to Use](how-to-use.md) and the settings in [configuration](configuration.md): `/aperture-setup`, `/aperture-status`, and `/aperture-disconnect` operate only locally. Validate browser-link cancellation, environment-variable-name-only enrollment, private `600` settings and `700` identity storage, and restart semantics. Setup has no state-path prompt. `/aperture-forget` must require disabled saved settings, confirmation, and a private plugin-owned unlocked profile, retain disabled settings, refuse unsafe deletion, and leave native auth and remote device revocation untouched. Environment host overrides must still take precedence over the saved HTTPS gateway. TUI tests and package imports do not by themselves prove OpenCode interactive loading.
 
 ## CI and Evidence
 
-### Final Production Verification
+### Historical Production Verification
 
 `bun scripts/probe-routing.ts --bridge-production` passed all five installed native HTTPS scenarios on OpenCode 1.18.29 / embedded Bun 1.3.14 with external worker Bun 1.4.2, darwin-arm64. Only the bridge factory module is fake: the installed index, guard and worker execute production code, with one proxied discovery before atomic activation. The fake module wraps worker-global fetch to assert the supplied proxy and fixed upstream before adding the per-request fixture CA to a real HTTP proxy fixture request. No parent/native auth-fetch replacement or production source patch is used. The source-built worker retains real bridge imports and explicit user-trusted `modulePath` loading.
 
