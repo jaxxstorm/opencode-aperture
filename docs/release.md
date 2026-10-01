@@ -24,6 +24,26 @@ If the package does not yet exist and npm cannot expose its trusted-publisher se
 
 ## Release Procedure
 
+### Automated Preparation
+
+Commit the release script and any feature changes first: preparation requires a clean worktree and an `origin` remote. Use external Bun 1.4.2. Choose a new stable package version; never reuse a failed or published tag.
+
+```sh
+# Read-only preflight: checks local/remote tags and npm availability.
+bun run release -- 0.1.2 --dry-run
+
+# Bump, verify, commit, tag, and atomically push to trigger release.yml.
+bun run release -- 0.1.2 --commit --push
+```
+
+The command updates only this plugin's package version, runs `bun install --ignore-scripts`, typecheck, unit tests, build, and clean-consumer package verification. The bridge dependency version stays unchanged. Before tagging, it verifies that the committed manifest matches the requested version. The push sends only the current branch and requested tag; it never force-pushes or publishes directly to npm. GitHub Actions performs the full routing checks and approval-gated publication.
+
+Without `--push`, `--commit` creates the local release commit and annotated tag only. Without either option, the command leaves the verified manifest/lockfile changes for manual review and commit; it does not support resuming that dirty state automatically. `--dry-run` may be combined with both flags to inspect preflight for the full operation without writing files or refs.
+
+Existing local/remote tags, existing npm versions, registry/network errors, dirty worktrees, detached HEADs, non-increasing versions and failed checks stop preparation. For a push, the remote branch must be an ancestor of local HEAD; fetch/rebase manually if needed. Failures deliberately leave files, commits and tags in place for inspection rather than rolling back or deleting user work. After a commit or push failure, inspect local/remote state and follow Recovery below; do not blindly rerun or force-move tags.
+
+### Candidate Pipeline
+
 1. Update the source-controlled version and review [verification](verification.md) and [compatibility evidence](compatibility.md). Inspect the three allowlisted bundles, manifest, README, docs, and LICENSE; exclude credentials and development files. Preserve the server factory, separate TUI export, internal worker, and native OAuth ownership. Require the main workstream's exact optional bridge `0.1.0` pin, `packageManager: bun@1.4.2`, lockfile update, removal of server/TUI enable guards, and updated clean-consumer checks before accepting a candidate.
 2. Record exact local results, including a credential-free publish dry run against the final candidate. Review the pinned Ubuntu/macOS baseline results separately. Require reported clean-consumer results for the published bridge and omitted-optional-dependency direct mode; do not infer them from workflow edits. Real-package checks are distinct from actual enrollment, which is not performed in CI. Live tests are optional, outside CI; native OAuth refresh/live tools and unsupported WebSockets/residency remain explicit limitations. Synthetic catalog refresh is a separate mandatory check below.
 3. After explicit release authorization and owner setup, push `vMAJOR.MINOR.PATCH` for the reviewed commit, with the suffix exactly matching `package.json`. Prerelease, malformed, and mismatched tags are rejected. There is no automatic version bump.
