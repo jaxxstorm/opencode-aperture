@@ -36,6 +36,7 @@ let injected = false;
 let tracePath: string | undefined;
 let gatewayBodyCount = 0;
 let gatewayHeaderCount = 0;
+let leakedFields: string[] = [];
 const results: string[] = [];
 const listeners: string[] = [];
 
@@ -56,7 +57,8 @@ async function stopChild() {
     if (pid) try { process.kill(-pid, signal); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error; }
   }
   kill("SIGTERM");
-  const timer = setTimeout(() => kill("SIGKILL"), 3000);
+  // The worker allows seven seconds for its helper to shut down and release state.
+  const timer = setTimeout(() => kill("SIGKILL"), 10000);
   await childExit;
   await Promise.all(drains);
   drains = [];
@@ -539,9 +541,16 @@ export async function createBridge() {
       const status = await api("/session/status");
       return status.status === 200 && (!status.data[id] || status.data[id].type === "idle");
     });
-    checkpoint = "cleanup";
+    checkpoint = "cleanup-process";
     await stopChild();
-    for (const secret of [access, account, refresh, "synthetic-other-provider-key", "relay-fixture-", "proxy-fixture-", "worker-fixture-", "aperture-worker-", "aperture-relay-"]) assert(!logs.includes(secret), "Sensitive fixture leaked to logs");
+    checkpoint = "cleanup-log-secrecy";
+    leakedFields = [
+      ["access", access], ["account", account], ["refresh", refresh], ["other-provider-key", "synthetic-other-provider-key"],
+      ["fixture-relay", "relay-fixture-"], ["fixture-proxy", "proxy-fixture-"], ["fixture-worker", "worker-fixture-"],
+      ["worker-capability", "aperture-worker-"], ["relay-capability", "aperture-relay-"],
+    ].filter(([, secret]) => logs.includes(secret!)).map(([field]) => field!);
+    assert.equal(leakedFields.length, 0, "Sensitive fixture leaked to logs");
+    checkpoint = "cleanup-listeners";
     await gateway.stop(true); gateway = undefined;
     await secureGateway?.stop(true); secureGateway = undefined;
     results.push(scenario);
@@ -554,6 +563,7 @@ export async function createBridge() {
     try { tracedRequests = (await readFile(tracePath, "utf8")).trim().split("\n").map(line => JSON.parse(line)).filter(event => event.event === "request" && event.path === "/codex/responses").length; } catch {}
   }
   // Never dump native logs, assertion values, request bodies, or raw errors.
+  if (leakedFields.length) console.error(JSON.stringify({ diagnostic: "log-secrecy", fields: leakedFields }));
   console.error(JSON.stringify({ status: "fail", phase, checkpoint, interrupted, injected, completed: results, gatewayHeaderCount, gatewayBodyCount, tracedRequests, timeout: error instanceof Error && error.name === "TimeoutError", syntax: error instanceof SyntaxError, bridgeSettingsInvalid: logs.includes("Invalid or unsafe Aperture bridge settings"), bridgeFailed: logs.includes("Aperture bridge: BRIDGE_FAILED"), bridgeDiscoveryFailed: logs.includes("Aperture bridge: DISCOVERY_FAILED"), bridgeModuleUnavailable: logs.includes("Aperture bridge: MODULE_UNAVAILABLE"), relayConfigurationMissing: logs.includes("Run the packaged Aperture plugin before the relay fixture"), relayTargetInvalid: logs.includes("Relay fixture requires a numeric loopback origin"), moduleMissing: logs.includes("Cannot find module"), installFailed: logs.includes("install failed"), diagnostics: "Raw errors and native logs withheld; check fixture assertions and prerequisites" }));
   process.exitCode = interrupted ? 130 : 1;
 } finally {

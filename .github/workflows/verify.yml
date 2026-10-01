@@ -33,13 +33,14 @@ jobs:
       matrix:
         os: [ubuntu-22.04, macos-14]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "22.14.0"
+          package-manager-cache: false
 
       - name: Install pinned npm
         run: npm install -g npm@11.5.1 --ignore-scripts --registry=https://registry.npmjs.org
@@ -99,13 +100,14 @@ jobs:
     timeout-minutes: 20
     if: github.event_name == 'workflow_dispatch'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "22.14.0"
+          package-manager-cache: false
 
       - name: Install pinned npm
         run: npm install -g npm@11.5.1 --ignore-scripts --registry=https://registry.npmjs.org

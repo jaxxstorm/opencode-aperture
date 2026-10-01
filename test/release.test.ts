@@ -60,6 +60,34 @@ const release = Bun.YAML.parse(await readFile(new URL("../.github/workflows/rele
 const commands = (job: Job) => job.steps?.map((step) => step.run ?? "").join("\n") ?? "";
 
 describe("release workflow boundaries", () => {
+  // Verified via GitHub action.yml metadata: download-artifact v6 still uses node20.
+  const node24Actions: Record<string, string> = {
+    "actions/checkout": "v6",
+    "actions/setup-node": "v6",
+    "actions/upload-artifact": "v6",
+    "actions/download-artifact": "v7",
+    "oven-sh/setup-bun": "v2",
+  };
+  for (const [workflowName, workflow] of Object.entries({ verify, release })) {
+    for (const [jobName, job] of Object.entries(workflow.jobs)) {
+      for (const step of job.steps ?? []) {
+        if (!step.uses) continue;
+        test(`${workflowName}.${jobName}: ${step.uses} uses a verified Node24 action major`, () => {
+          const action = step.uses!.split("@")[0];
+          expect(node24Actions[action]).toBeDefined();
+          expect(step.uses).toBe(`${action}@${node24Actions[action]}`);
+          if (action === "actions/checkout") expect(step.with?.["persist-credentials"]).toBe(false);
+          if (action === "oven-sh/setup-bun") expect(step.with?.["bun-version"]).toBe("1.4.2");
+          if (action === "actions/setup-node") {
+            expect(step.with?.["node-version"]).toBe("22.14.0");
+            expect(step.with?.["package-manager-cache"]).toBe(false);
+            expect(step.with?.cache).toBeUndefined();
+            expect(commands(job)).toContain("npm@11.5.1");
+          }
+        });
+      }
+    }
+  }
   test("ordinary verification is reusable, read-only, bounded, and pinned", () => {
     expect(Object.keys(verify.on).sort()).toEqual(["pull_request", "push", "workflow_call", "workflow_dispatch"]);
     expect(verify.on.push).toEqual({ branches: ["main"] });

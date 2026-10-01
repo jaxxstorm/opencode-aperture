@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - uses: oven-sh/setup-bun@v2
@@ -43,12 +43,13 @@ jobs:
       # The harness creates private randomized directories beneath this short parent.
       APERTURE_TEST_TMPDIR: /tmp
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "22.14.0"
+          package-manager-cache: false
       - name: Install pinned npm and OpenCode
         run: |
           npm install -g npm@11.5.1 --ignore-scripts --registry=https://registry.npmjs.org
@@ -94,7 +95,7 @@ jobs:
             printf '\nSHA-256: '
             cat "$APERTURE_TEST_TARBALL.sha256"
           } >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: release-candidate
           path: release-artifacts/*
@@ -112,18 +113,19 @@ jobs:
       contents: write
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "22.14.0"
+          package-manager-cache: false
       - name: Install OIDC-capable pinned npm
         run: npm install -g npm@11.5.1 --ignore-scripts --registry=https://registry.npmjs.org
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.4.2"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           name: release-candidate
           path: release-artifacts
