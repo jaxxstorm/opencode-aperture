@@ -1,28 +1,31 @@
-#!/bin/zsh
+#!/bin/sh
 # Launch the prepared local test profile, not your normal OpenCode installation's data.
 set -eu
 umask 077
 
 test_root="${APERTURE_TEST_TMPDIR:-${TMPDIR:-/tmp}/opencode}"
 profile="${APERTURE_LOCAL_PROFILE:-$test_root/aperture-local-test}"
-bun_bin="${BUN_BIN:-$(command -v bun)}"
-opencode_bin="${OPENCODE_BIN:-$(command -v opencode)}"
+bun_bin="${BUN_BIN:-$(command -v bun || true)}"
+opencode_bin="${OPENCODE_BIN:-$(command -v opencode || true)}"
 
-if [[ "$profile" != /* ]]; then
-  print -u2 -- "APERTURE_LOCAL_PROFILE must be an absolute directory: $profile"
-  exit 1
-fi
+case "$profile" in
+  /*) ;;
+  *) printf '%s\n' "APERTURE_LOCAL_PROFILE must be an absolute directory: $profile" >&2; exit 1 ;;
+esac
 for required in project/opencode.json project/tui.json config/opencode-aperture/settings.json; do
-  if [[ ! -f "$profile/$required" ]]; then
-    print -u2 -- "Prepared local test profile is incomplete. Missing: $profile/$required"
-    print -u2 -- "Set APERTURE_LOCAL_PROFILE if your prepared profile is elsewhere. Existing settings and identity were not changed."
+  if [ ! -f "$profile/$required" ]; then
+    printf '%s\n' "Prepared local test profile is incomplete. Missing: $profile/$required" >&2
+    printf '%s\n' "Set APERTURE_LOCAL_PROFILE if your prepared profile is elsewhere. Existing settings and identity were not changed." >&2
     exit 1
   fi
 done
-if [[ "$bun_bin" != /* || ! -x "$bun_bin" || "$opencode_bin" != /* || ! -x "$opencode_bin" ]]; then
-  print -u2 -- "Set BUN_BIN and OPENCODE_BIN to absolute executable paths."
+for executable in "$bun_bin" "$opencode_bin"; do
+  case "$executable" in
+    /*) if [ -x "$executable" ]; then continue; fi ;;
+  esac
+  printf '%s\n' "Set BUN_BIN and OPENCODE_BIN to absolute executable paths." >&2
   exit 1
-fi
+done
 
 # Read only the nonsecret gateway setting; never copy normal auth or user config.
 gateway="${APERTURE_TEST_GATEWAY:-$("$bun_bin" --no-env-file --config=/dev/null -e '
@@ -32,6 +35,6 @@ gateway="${APERTURE_TEST_GATEWAY:-$("$bun_bin" --no-env-file --config=/dev/null 
   console.log(gateway.origin);
 ' "$profile/config/opencode-aperture/settings.json")}"
 
-repo="${0:A:h:h}"
-exec "$bun_bin" --no-env-file --config=/dev/null "$repo/scripts/launch-env.ts" \
+script_dir=$(CDPATH= cd -P "$(dirname "$0")" && pwd -P)
+exec "$bun_bin" --no-env-file --config=/dev/null "$script_dir/launch-env.ts" \
   "$profile" "$test_root" "$bun_bin" "$opencode_bin" "$gateway" "$@"

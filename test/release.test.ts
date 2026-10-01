@@ -76,6 +76,13 @@ describe("release workflow boundaries", () => {
     }
     expect(commands(verify.jobs.baseline)).toContain("opencode-ai@1.18.29");
   });
+  test("launcher and CI require only POSIX sh, not zsh", async () => {
+    const launcher = await readFile(new URL("../scripts/launch.sh", import.meta.url), "utf8");
+    expect(launcher.startsWith("#!/bin/sh\n")).toBe(true);
+    expect(launcher).not.toContain("[[");
+    expect(JSON.stringify(verify)).not.toContain("zsh");
+  });
+
   test("canary input is shell data and exact version reaches both later checks", async () => {
     const job = verify.jobs.canary;
     expect(job.if).toBe("github.event_name == 'workflow_dispatch'");

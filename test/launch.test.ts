@@ -8,8 +8,8 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
-async function launch(extra: Record<string, string> = {}, args: string[] = []) {
-  const root = await realpath(await mkdtemp(join(tmpdir(), "aperture-launch-")));
+async function launch(extra: Record<string, string> = {}, args: string[] = [], shell = "/bin/sh") {
+  const root = await realpath(await mkdtemp(join(tmpdir(), "aperture launch-")));
   roots.push(root);
   for (const dir of ["project", "config/opencode-aperture"]) {
     await mkdir(join(root, dir), { recursive: true });
@@ -37,13 +37,13 @@ console.log(JSON.stringify({
   debug: env.OPENCODE_APERTURE_DEBUG === "1",
   isolated: env.HOME === process.cwd().replace(/\\/project$/, "/home") &&
     env.XDG_CONFIG_HOME === process.cwd().replace(/\\/project$/, "/config") &&
-    env.OPENCODE_APERTURE_ENABLE === undefined && env.APERTURE_HOST === "https://gateway.example",
+    env.OPENCODE_APERTURE_ENABLE === undefined && env.APERTURE_HOST === "https://gateway.example" && env.SHELL === "/bin/sh",
   args: process.argv.slice(2).every(arg => !arg.includes("secret-sentinel"))
 }));
 if (mode === "exit") process.exit(23);
 `);
   await chmod(executable, 0o700);
-  return Bun.spawn(["/bin/zsh", resolve("scripts/launch.zsh"), ...args], {
+  return Bun.spawn([shell, resolve("scripts/launch.sh"), ...args], {
     env: {
       PATH: process.env.PATH!,
       APERTURE_LOCAL_PROFILE: root,
@@ -58,6 +58,14 @@ if (mode === "exit") process.exit(23);
     stdout: "pipe", stderr: "pipe",
   });
 }
+
+test.each(["dash", "bash"].filter(shell => Bun.which(shell)))("launcher works under %s with spaces in profile paths", async shell => {
+  const child = await launch({}, [], Bun.which(shell)!);
+  const result = await new Response(child.stdout).json();
+  expect(result.isolated).toBe(true);
+  expect(result.key).toBe(false);
+  expect(await child.exited).toBe(0);
+});
 
 test("launch keeps ambient keys out by default", async () => {
   const child = await launch();

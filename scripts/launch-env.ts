@@ -4,7 +4,7 @@ import { constants } from "node:os";
 
 const [profile, testRoot, bun, opencode, gateway, ...args] = process.argv.slice(2);
 if (!profile || !testRoot || !bun || !opencode || !gateway) {
-  console.error("Use scripts/launch.zsh to launch the prepared profile.");
+  console.error("Use scripts/launch.sh to launch the prepared profile.");
   process.exit(1);
 }
 
@@ -24,7 +24,7 @@ const env: Record<string, string> = {
   TERM: process.env.TERM || "xterm-256color",
   COLORTERM: process.env.COLORTERM || "truecolor",
   LANG: process.env.LANG || "en_US.UTF-8",
-  SHELL: "/bin/zsh",
+  SHELL: "/bin/sh",
   OPENCODE_DISABLE_EXTERNAL_SKILLS: "1",
   OPENCODE_DISABLE_MODELS_FETCH: "1",
   OPENCODE_DISABLE_AUTOUPDATE: "1",

@@ -5,11 +5,14 @@
 Run the already-prepared isolated local profile from this checkout:
 
 ```sh
-zsh scripts/launch.zsh
+sh scripts/launch.sh
 ```
 
+The launcher uses POSIX `sh` on macOS/Linux; zsh is not required. It still needs
+Bun, OpenCode, and a prepared isolated profile. Native Windows is not supported.
+
 Debug output is off by default. For troubleshooting only, run
-`OPENCODE_APERTURE_DEBUG=1 zsh scripts/launch.zsh`. Debug lines are written to
+`OPENCODE_APERTURE_DEBUG=1 sh scripts/launch.sh`. Debug lines are written to
 stderr and may overlap the TUI; restart without that flag for a quiet session.
 
 This wrapper loads the built plugin registrations from the test project and
@@ -44,7 +47,7 @@ Native OpenAI login is not required for model visibility or gateway-managed/API-
 inference; it remains separate for subscription inference and is also isolated:
 
 ```sh
-zsh scripts/launch.zsh auth login
+sh scripts/launch.sh auth login
 ```
 
 The launcher does not create the profile, enroll a device, or alter normal user
@@ -72,7 +75,7 @@ populated environment. The helper builds an isolated child environment and passe
 selected values through that environment, not process arguments:
 
 ```sh
-APERTURE_PASSTHROUGH_ENV=PROVIDER_API_KEY,SECOND_PROVIDER_KEY zsh scripts/launch.zsh
+APERTURE_PASSTHROUGH_ENV=PROVIDER_API_KEY,SECOND_PROVIDER_KEY sh scripts/launch.sh
 ```
 
 Those are names only, not key assignments. Never put key values inline in commands,
