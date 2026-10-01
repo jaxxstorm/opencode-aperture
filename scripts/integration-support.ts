@@ -31,7 +31,7 @@ export async function command(args: string[], cwd: string, env?: Record<string, 
   } finally { clearTimeout(timer); }
 }
 
-export async function consumer(tarball = process.env.APERTURE_TEST_TARBALL) {
+export async function consumer(tarball = process.env.APERTURE_TEST_TARBALL, { bridge = false }: { bridge?: boolean } = {}) {
   const root = await realpath(await mkdtemp(join(temporaryBase, "aperture-integration-")));
   try {
     assert(!(await realpath(root)).startsWith(await realpath(checkout)), "Consumer must be outside checkout");
@@ -63,11 +63,16 @@ export async function consumer(tarball = process.env.APERTURE_TEST_TARBALL) {
     assert.equal(license, await Bun.file(join(checkout, "LICENSE")).text(), "Candidate must include the approved MIT license");
     assert.equal(manifest.main.replace(/^\.\//, ""), "dist/index.js");
     assert.deepEqual(manifest.exports, { ".": "./dist/index.js", "./server": "./dist/index.js", "./tui": "./dist/tui.js" }, "Unexpected package exports");
-    for (const field of ["dependencies", "optionalDependencies", "peerDependencies"]) {
-      assert.equal(Object.keys(manifest[field] ?? {}).length, 0, "Distribution must not declare runtime dependencies");
+    for (const field of ["dependencies", "peerDependencies"]) {
+      assert.deepEqual(manifest[field] ?? {}, {}, "Distribution must not declare dependencies or peerDependencies");
+    }
+    assert.deepEqual(manifest.optionalDependencies, { "@jaxxstorm/bun-tailscale-bridge": "0.1.0" }, "Unexpected optional dependencies; only the exact bridge 0.1.0 is allowed");
+    for (const field of ["bundledDependencies", "bundleDependencies"]) {
+      assert(manifest[field] === undefined || manifest[field] === false
+        || (Array.isArray(manifest[field]) && manifest[field].length === 0), "Distribution must not bundle dependencies");
     }
     await Bun.write(join(root, "work/package.json"), JSON.stringify({ private: true, type: "module" }));
-    await command(["npm", "install", "--ignore-scripts", "--omit=dev", "--no-audit", "--no-fund", tarball!], join(root, "work"), isolatedEnv(root));
+    await command(["npm", "install", "--ignore-scripts", "--omit=dev", bridge ? "--include=optional" : "--omit=optional", "--no-audit", "--no-fund", tarball!], join(root, "work"), isolatedEnv(root));
     const installed = join(root, "work/node_modules", packageName);
     assert((await realpath(installed)).startsWith(root));
     for (const file of new Set([...Object.values(manifest.exports) as string[], "./dist/bridge-worker.js"])) {

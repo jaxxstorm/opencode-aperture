@@ -15,12 +15,32 @@ test.each([
   ["license-text", "approved MIT license"],
   ["version", "differs from source metadata"],
   ["extra-export", "Unexpected package exports"],
+  ["missing-bridge", "Unexpected optional dependencies"],
+  ["bridge-range", "Unexpected optional dependencies"],
+  ["bridge-version", "Unexpected optional dependencies"],
+  ["extra-optional", "Unexpected optional dependencies"],
+  ["dependency", "must not declare dependencies"],
+  ["peer", "must not declare dependencies"],
+  ["bundled", "must not bundle dependencies"],
+  ["bundle-alias", "must not bundle dependencies"],
+  ["bundle-all", "must not bundle dependencies"],
+  ["secret-file", "Unexpected tarball contents"],
   ["invalid-archive", "failed"],
 ])("supplied candidate: %s, with bounded consumer cleanup", async (scenario, error) => {
   root = await mkdtemp(join(temporaryBase, "aperture-package-fixture-"));
   const audit = join(root, "audit");
   await mkdir(audit);
   const manifest = await Bun.file(join(checkout, "package.json")).json();
+  manifest.optionalDependencies = { "@jaxxstorm/bun-tailscale-bridge": "0.1.0" };
+  if (scenario === "missing-bridge") delete manifest.optionalDependencies;
+  if (scenario === "bridge-range") manifest.optionalDependencies["@jaxxstorm/bun-tailscale-bridge"] = "^0.1.0";
+  if (scenario === "bridge-version") manifest.optionalDependencies["@jaxxstorm/bun-tailscale-bridge"] = "0.1.1";
+  if (scenario === "extra-optional") manifest.optionalDependencies.unexpected = "1.0.0";
+  if (scenario === "dependency") manifest.dependencies = { "@jaxxstorm/bun-tailscale-bridge": "0.1.0" };
+  if (scenario === "peer") manifest.peerDependencies = { unexpected: "1.0.0" };
+  if (scenario === "bundled") manifest.bundledDependencies = ["@jaxxstorm/bun-tailscale-bridge"];
+  if (scenario === "bundle-alias") manifest.bundleDependencies = ["unexpected"];
+  if (scenario === "bundle-all") manifest.bundledDependencies = true;
   if (scenario === "private") manifest.private = true;
   if (scenario === "license-metadata") delete manifest.license;
   if (scenario === "version") manifest.version = "999.0.0";
@@ -35,6 +55,7 @@ test.each([
   entries.LICENSE = scenario === "license-text" ? "not the approved license" : await Bun.file(join(checkout, "LICENSE")).text();
   if (scenario === "missing-license") delete entries.LICENSE;
   if (scenario === "extra-file") entries["unexpected.txt"] = "not for distribution";
+  if (scenario === "secret-file") entries[".env"] = "FIXTURE_SECRET=not-a-real-secret";
   for (const [file, content] of Object.entries(entries)) await Bun.write(join(root, "package", file), content);
   const tarball = join(root, "supplied candidate.tgz");
   if (scenario === "invalid-archive") await Bun.write(tarball, "not a gzip archive");
@@ -51,6 +72,7 @@ test.each([
     } else {
       const result = await consumer();
       try {
+        assert.equal(await Bun.file(result.root + "/work/node_modules/@jaxxstorm/bun-tailscale-bridge/package.json").exists(), false);
         const entry = result.installed + "/dist/index.js";
         assert.equal(await Bun.file(entry).text(), ${JSON.stringify(bundle)});
         const factory = (await import(pathToFileURL(entry).href)).default;

@@ -15,8 +15,10 @@ stderr and may overlap the TUI; restart without that flag for a quiet session.
 This wrapper loads the built plugin registrations from the test project and
 isolates HOME, OpenCode configuration, credentials, cache, and node state. It
 reads the gateway from that profile's nonsecret settings and strips inherited
-auth keys unless explicitly allowlisted by name. It sets the required `OPENCODE_APERTURE_ENABLE=1` only for
-the isolated test process; do not add global configuration or global enablement.
+auth keys unless explicitly allowlisted by name. The release activates through
+server/TUI registration without an `OPENCODE_APERTURE_ENABLE` requirement; an old
+launcher flag is not a release prerequisite or a disable switch. Do not add global
+or workspace plugin registrations for verification.
 Use `/aperture-login` to enroll with the prepared settings, or
 `/aperture-setup` to edit them. Browser enrollment displays a private URL and
 attempts to open it on macOS/Linux only when a new URL arrives. Reused authorized
@@ -88,17 +90,35 @@ tests pass, including explicit environment forwarding and shutdown behavior.
 
 See [developer verification](../docs/verification.md) for prerequisites, commands,
 synthetic HOME/XDG isolation, and the distinction between passed and pending checks.
-The harness uses stock OpenCode with ordinary POSIX process spawning. On macOS,
-credential-bearing routing probes use a localhost-only `sandbox-exec` policy;
-other platforms do not have equivalent egress enforcement here. Public dependency
-preparation occurs before that sandbox. The cleanup verifier remains part of verification.
+The harness uses stock OpenCode 1.18.29 (embedded Bun 1.3.14) with ordinary POSIX
+process spawning; run build/test and the worker with external Bun 1.4.2. On macOS,
+credential-bearing routing probes use a localhost-only `sandbox-exec` policy.
+The older direct probe and cleanup verifier allow Linux, without equivalent egress
+enforcement. All production bridge modes explicitly reject non-macOS platforms.
+They also require OpenSSL with `req -addext` support; workflows select OpenSSL 3.
+Public dependency preparation occurs before the sandbox. The cleanup verifier
+remains part of verification.
 
 Set `APERTURE_TEST_TARBALL` to an absolute candidate tarball path for
-`bun run test:package`, `bun run test:routing`, and
-`bun scripts/verify-probe-cleanup.ts` to inspect/install the same artifact without
-repacking. Unset it to restore ordinary pack-from-checkout checks. See the
+`bun run test:package`, `bun run test:routing`,
+`bun scripts/verify-probe-cleanup.ts`, and every production probe below to
+inspect/install the same artifact without repacking. Unset it to restore ordinary
+pack-from-checkout checks. The release job packs once on mandatory macOS and runs
+gateway, subscription, and refresh probes against that exact candidate before
+retaining and publishing unchanged bytes. Baseline production steps run only on
+macOS; the Linux canary covers direct routing, not production bridge modes. See the
 [release procedure](../docs/release.md) for checksum, approval, and recovery steps;
 these verification scripts do not publish.
+
+The published optional bridge is `@jaxxstorm/bun-tailscale-bridge@0.1.0` (Bun
+engine `1.4.2`). The release contract installs it by default through the exact
+optional-dependency pin; direct routing can omit it. Normal registered-package
+setup leaves `modulePath` blank for resolution by the worker within the installed
+package. Clean-consumer checks pass with the published bridge installed and omitted,
+including registration without an enable flag and default worker package resolution.
+CI production fixtures do not enroll a real
+device. SDK-dependent unit probes need `APERTURE_SDK_TEST_DIR`, which these
+workflows do not set; do not equate CI unit coverage with historical SDK-enabled runs.
 
 ## Installed Production Probe
 

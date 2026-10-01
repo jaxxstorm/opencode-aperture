@@ -139,9 +139,14 @@ describe("configuration ownership", () => {
 });
 
 describe("plugin hooks and safe failures", () => {
-  test("server plugin is inert unless explicitly enabled", async () => {
+  test("explicit plugin registration activates hooks without an environment flag", async () => {
     delete process.env.OPENCODE_APERTURE_ENABLE;
-    expect(await plugin()).toEqual({});
+    const network = spyOn(globalThis, "fetch");
+    const hooks = await plugin();
+    expect(typeof hooks.config).toBe("function");
+    expect(typeof hooks["chat.headers"]).toBe("function");
+    expect(network).not.toHaveBeenCalled();
+    await hooks.dispose();
   });
 
   test("registers hooks without network and leaves native config unchanged on setup failure", async () => {

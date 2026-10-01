@@ -10,7 +10,6 @@ import { createBridgeSocketDir, defaultBridgeSettings, forgetBridgeState, loadBr
 export default {
   id: "@jaxxstorm/opencode-aperture",
   async tui(api) {
-    if (process.env.OPENCODE_APERTURE_ENABLE !== "1") return;
     let running: Promise<void> | undefined;
     let controller: AbortController | undefined;
     let disposing = false;
@@ -143,7 +142,7 @@ export default {
       if (executable === undefined) return;
       const modulePath = kind === "login" ? settings.bridge.modulePath ?? "" : await prompt("Trusted bridge JS entry (absolute; blank = installed package)", settings.bridge.modulePath ?? "");
       if (modulePath === undefined) return;
-      if (kind !== "login" && modulePath && !await confirm("This explicitly trusts executable JavaScript. Install the unpublished bridge in a private local runtime and select its JS entry only if you trust the code. It runs with your user permissions.")) return;
+      if (kind !== "login" && modulePath && !await confirm("This overrides the packaged bridge with executable JavaScript. Select this JS entry only if you trust the code. It runs with your user permissions.")) return;
       const hostname = kind === "login" ? settings.bridge.hostname : await prompt("Tailnet device hostname", settings.bridge.hostname);
       if (hostname === undefined) return;
       const enrollment = await select("Enroll device", [

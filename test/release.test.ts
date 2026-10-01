@@ -70,7 +70,7 @@ describe("release workflow boundaries", () => {
       expect(job.permissions).toBeUndefined();
       expect(job["timeout-minutes"]).toBeGreaterThan(0);
       expect(commands(job)).not.toMatch(/npm publish|gh release|secrets\./);
-      expect(job.steps?.some((step) => step.with?.["bun-version"] === "1.3.14")).toBe(true);
+      expect(job.steps?.some((step) => step.with?.["bun-version"] === "1.4.2")).toBe(true);
       expect(job.steps?.some((step) => step.with?.["node-version"] === "22.14.0")).toBe(true);
       for (const command of ["npm@11.5.1", "bun install --frozen-lockfile", "bun run typecheck", "bun test", "bun run build", "bun run test:package", "bun run test:routing", "bun scripts/verify-probe-cleanup.ts"]) expect(commands(job)).toContain(command);
     }
@@ -120,9 +120,11 @@ describe("release workflow boundaries", () => {
   test("one checksummed candidate is exercised and retained for recovery", () => {
     const job = release.jobs.candidate;
     const run = commands(job);
+    expect(job["runs-on"]).toBe("macos-14");
+    expect(job.steps!.some(step => step.with?.["bun-version"] === "1.4.2")).toBe(true);
     expect(run.match(/bun run pack/g)).toHaveLength(1);
     expect(run.indexOf("release.ts identity")).toBeLessThan(run.indexOf("bun run pack"));
-    const ordered = ["bun run pack", "release.ts checksum", "bun run test:package", "bun run test:routing", "verify-probe-cleanup.ts", "release.ts verify"];
+    const ordered = ["bun run pack", "release.ts checksum", "bun run test:package", "bun run test:routing", "verify-probe-cleanup.ts", "probe-routing.ts --bridge-production-gateway", "probe-routing.ts --bridge-production\n", "probe-routing.ts --bridge-production-refresh", "release.ts verify"];
     for (let i = 1; i < ordered.length; i++) expect(run.indexOf(ordered[i])).toBeGreaterThan(run.indexOf(ordered[i - 1]));
     expect(run).toContain('"$APERTURE_TEST_TARBALL"');
     expect(run).toContain("GITHUB_STEP_SUMMARY");

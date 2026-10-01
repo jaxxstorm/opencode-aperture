@@ -23,9 +23,11 @@ jobs:
   baseline:
     name: baseline-${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 40
     env:
       OPENCODE_EXPECT_VERSION: "1.18.29"
+      # Keep production Unix socket paths below the worker's 100-byte limit.
+      APERTURE_TEST_TMPDIR: /tmp
     strategy:
       fail-fast: false
       matrix:
@@ -45,10 +47,17 @@ jobs:
       - name: Install pinned OpenCode 1.18.29
         run: npm install -g "opencode-ai@1.18.29"
 
-      - name: Install pinned Bun 1.3.14
+      - name: Install external Bun 1.4.2 (not OpenCode's embedded Bun)
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.3.14"
+          bun-version: "1.4.2"
+
+      - name: Prepare macOS production probe prerequisites
+        if: runner.os == 'macOS'
+        run: |
+          brew install openssl@3
+          printf '%s/bin\n' "$(brew --prefix openssl@3)" >> "$GITHUB_PATH"
+          command -v sandbox-exec
 
       - name: Locked install
         run: bun install --frozen-lockfile
@@ -70,6 +79,19 @@ jobs:
 
       - name: Cleanup verification
         run: bun scripts/verify-probe-cleanup.ts
+
+      # Production modes require the localhost-only macOS credential-fixture sandbox.
+      - name: Packaged production gateway probe
+        if: runner.os == 'macOS'
+        run: bun scripts/probe-routing.ts --bridge-production-gateway
+
+      - name: Packaged production subscription probe
+        if: runner.os == 'macOS'
+        run: bun scripts/probe-routing.ts --bridge-production
+
+      - name: Packaged production catalog refresh probe
+        if: runner.os == 'macOS'
+        run: bun scripts/probe-routing.ts --bridge-production-refresh
 
   canary:
     name: canary-opencode-${{ inputs.opencode_version || 'latest' }}
@@ -97,10 +119,10 @@ jobs:
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]
           printf 'OPENCODE_EXPECT_VERSION=%s\n' "$VERSION" >> "$GITHUB_ENV"
 
-      - name: Install pinned Bun 1.3.14
+      - name: Install external Bun 1.4.2 (not OpenCode's embedded Bun)
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.3.14"
+          bun-version: "1.4.2"
 
       - name: Locked install
         run: bun install --frozen-lockfile

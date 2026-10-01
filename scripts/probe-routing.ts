@@ -252,7 +252,7 @@ export async function createBridge() {
     const reservation = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response() });
     const port = reservation.port!;
     reservation.stop(true);
-    const env: Record<string, string> = { ...isolatedEnv(root), NPM_CONFIG_OFFLINE: "true", APERTURE_HOST: productionMode ? `https://127.0.0.1:${secureGateway!.port}` : `http://127.0.0.1:${gateway.port}`, OPENCODE_APERTURE_ENABLE: "1", OPENCODE_APERTURE_DEBUG: "1",
+    const env: Record<string, string> = { ...isolatedEnv(root), NPM_CONFIG_OFFLINE: "true", APERTURE_HOST: productionMode ? `https://127.0.0.1:${secureGateway!.port}` : `http://127.0.0.1:${gateway.port}`, OPENCODE_APERTURE_DEBUG: "1",
       ...(productionMode && process.env.APERTURE_TEST_TMPDIR ? { TMPDIR: process.env.APERTURE_TEST_TMPDIR } : {}),
       ...(proxyMode ? { APERTURE_RELAY_FIXTURE_PROXY: "1" } : {}),
       ...(secureGateway ? { APERTURE_RELAY_FIXTURE_TARGET: `https://127.0.0.1:${secureGateway.port}`, APERTURE_RELAY_FIXTURE_CA: cert } : {}),

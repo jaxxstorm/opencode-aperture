@@ -20,7 +20,7 @@ beforeEach(async () => {
   root = await mkdtemp(join(await realpath(tmpdir()), "aperture-tui-test-"));
   process.env.XDG_CONFIG_HOME = join(root, "config");
   process.env.XDG_STATE_HOME = join(root, "state");
-  process.env.OPENCODE_APERTURE_ENABLE = "1";
+  delete process.env.OPENCODE_APERTURE_ENABLE;
 });
 afterEach(async () => {
   openBrowser.mockRestore();

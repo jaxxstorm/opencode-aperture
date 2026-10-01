@@ -37,7 +37,7 @@ console.log(JSON.stringify({
   debug: env.OPENCODE_APERTURE_DEBUG === "1",
   isolated: env.HOME === process.cwd().replace(/\\/project$/, "/home") &&
     env.XDG_CONFIG_HOME === process.cwd().replace(/\\/project$/, "/config") &&
-    env.OPENCODE_APERTURE_ENABLE === "1" && env.APERTURE_HOST === "https://gateway.example",
+    env.OPENCODE_APERTURE_ENABLE === undefined && env.APERTURE_HOST === "https://gateway.example",
   args: process.argv.slice(2).every(arg => !arg.includes("secret-sentinel"))
 }));
 if (mode === "exit") process.exit(23);

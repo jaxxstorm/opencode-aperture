@@ -11,7 +11,6 @@ import {
 } from "./aperture-codex-plugin";
 
 export default (async (_input?: PluginInput, options: Pick<ApertureProviderOptions, "auth"> = {}) => {
-  if (process.env.OPENCODE_APERTURE_ENABLE !== "1") return {} satisfies Hooks;
   const debug = process.env.OPENCODE_APERTURE_DEBUG === "1";
   let origin: string | undefined;
   let configured = false;

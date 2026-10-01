@@ -2,13 +2,13 @@
 
 Discover Aperture's remote provider catalog and route supported OpenCode models through a trusted gateway, directly or over an optional Tailscale bridge. Gateway-managed credentials are the default when `requires_client_auth` is absent or false; explicit API-key passthrough and native OpenAI subscription Responses routing are also available. OpenCode continues to own subscription OAuth login, refresh, persistence, and authentication headers.
 
-**Local candidate, not yet published.** The owner-approved package is `@jaxxstorm/opencode-aperture@0.1.0`, licensed under MIT, copyright 2026 Lee Briggs. The optional Tailscale bridge is wired, source-built, and verified through installed production bundles with a fake bridge factory; the real bridge is also unpublished and must currently be installed from a separately reviewed local tarball. Authorized live catalog discovery through the real bridge succeeded on 2026-09-29; no live inference was performed. See the [verification boundary](#verification-boundary) and [compatibility evidence](docs/compatibility.md).
+**Plugin candidate, not yet published.** The owner-approved package is `@jaxxstorm/opencode-aperture@0.1.0`, licensed under MIT, copyright 2026 Lee Briggs. The optional bridge **`@jaxxstorm/bun-tailscale-bridge@0.1.0` is published**, with registry-confirmed Bun engine requirement `1.4.2`. Clean-consumer checks pass with the exact optional dependency installed and omitted, and registration activates the plugin without an environment flag. Authorized live catalog discovery through the real bridge succeeded on 2026-09-29; those probes did not send live inference. See the [verification boundary](#verification-boundary) and [compatibility evidence](docs/compatibility.md).
 
 ## Trust and Support Boundary
 
 The gateway receives request content and, in passthrough or subscription mode, your selected API key or subscription bearer credentials. Gateway-managed mode strips upstream authentication supplied by SDKs rather than borrowing native credentials. Confirm who operates the gateway and that you are authorized to send content and any selected credentials there before starting OpenCode. Bridge mode requires HTTPS. Direct mode retains HTTP support only for an explicitly trusted, independently protected network; the default hostname does not provide encryption.
 
-The earlier direct-routing baseline is stock **OpenCode 1.18.29, Bun 1.3.14, darwin-arm64**, using native OpenAI subscription authentication and HTTP/SSE. The bridge worker requires a separate **Bun 1.4.2** executable. This is a version-sensitive workaround, not a supported upstream transport hook or an open-ended minimum-version guarantee. WebSockets and residency-sensitive accounts are unsupported.
+Use stock **OpenCode 1.18.29** and external **Bun 1.4.2** for installation, build, tests, and the bridge worker. OpenCode's **embedded Bun 1.3.14** is a separate runtime, not the external Bun version to install; it remains the historical native-host baseline on darwin-arm64. This is a version-sensitive workaround, not a supported upstream transport hook or an open-ended minimum-version guarantee. WebSockets and residency-sensitive accounts are unsupported.
 
 Do not combine this plugin with plugins that replace OpenAI auth/fetch or override its gateway configuration. This plugin configures routing; it is not a security enforcement product and does not guarantee where requests go if loading or setup fails.
 
@@ -47,7 +47,7 @@ This is local built-file loading, not proof of clean package installation. To pr
 
 The local setup flow and command registrations are implemented; both files above are required. Building and verifying this candidate did not configure your actual `opencode.json`, `tui.json`, or global settings. Real interactive TUI/browser verification remains deferred.
 
-Server routing also requires **`OPENCODE_APERTURE_ENABLE=1`** in the server process environment. Without that exact value the server plugin installs no hooks. Keep registration and enablement scoped to an explicitly selected consumer/test profile; do not configure your global OpenCode profile for these tests. `scripts/launch.zsh` sets the flag only for its isolated test process.
+The release contract activates server routing and TUI commands through their respective plugin registrations, without an `OPENCODE_APERTURE_ENABLE` opt-in. Keep registrations scoped to an explicitly selected consumer/test profile; do not configure your global OpenCode profile for these tests. Removing an old enable flag is not a way to disable the released plugin; remove its registrations and restart instead.
 
 ### After an Approved Release Only
 
@@ -60,13 +60,22 @@ The following version-pinned registry registration is **not usable until this na
 }
 ```
 
-Register the same pinned package name in `tui.json` with `"$schema": "https://opencode.ai/tui.json"` and `"plugin": ["@jaxxstorm/opencode-aperture@0.1.0"]`; OpenCode's package TUI resolution selects the separate `/tui` export. Server registration alone does not configure these TUI commands. OpenCode installs registered registry plugins. Do not use an unpinned name or `latest` for a compatibility-sensitive deployment. Keep OpenCode pinned too; rerun packaged checks before upgrading either component.
+Register the same pinned package in the consumer's separate `tui.json`:
 
-### Optional Local Bridge Setup
+```json
+{
+  "$schema": "https://opencode.ai/tui.json",
+  "plugin": ["@jaxxstorm/opencode-aperture@0.1.0"]
+}
+```
 
-Direct mode needs no bridge installation. For bridge mode, obtain and independently verify the exact trusted bridge tarball and its checksum before installing it. `@jaxxstorm/bun-tailscale-bridge` currently returns npm E404; do not try a guessed registry version. No bridge dependency or optional dependency is declared by this plugin until a registry release is available. The inspected artifact checksum and provenance limits are in [compatibility](docs/compatibility.md).
+OpenCode's package TUI resolution selects the separate `/tui` export. Server registration alone does not configure these TUI commands. OpenCode installs registered registry plugins. Do not use an unpinned name or `latest` for a compatibility-sensitive deployment. Keep OpenCode pinned too; rerun packaged checks before upgrading either component. These examples do not change this workspace or your global configuration.
 
-Install the reviewed artifact in a private per-user runtime outside your project, config, and node identity directory. Replace the tarball placeholder below with the absolute path to that verified artifact; these commands do not download a bridge or upgrade Bun:
+### Optional Bridge Setup
+
+The release pins `@jaxxstorm/bun-tailscale-bridge` to **`0.1.0`** in `optionalDependencies`. Normal package installation includes optional dependencies by default; bridge use remains opt-in through setup. Direct routing needs no bridge and remains available when optional dependencies are omitted (for example, with `npm install --omit=optional`) or the bridge cannot be installed. Bridge mode requires the bridge to be present and loadable; it does not silently fall back to direct routing.
+
+For a normal registered-package installation, leave setup's **module path blank**. The worker resolves the bridge package from within the installed plugin package, not from an arbitrary consumer working directory. If you deliberately use a separate runtime or local built-file loading, you can install the published bridge into a new private per-user runtime outside your project, config, and node identity directory:
 
 ```sh
 umask 077
@@ -74,13 +83,13 @@ APERTURE_RUNTIME="$HOME/.local/share/opencode-aperture-runtime"
 mkdir -p "$APERTURE_RUNTIME"
 chmod 700 "$APERTURE_RUNTIME"
 bun -e 'await Bun.write(process.argv[1], JSON.stringify({ private: true, type: "module" }) + "\n")' "$APERTURE_RUNTIME/package.json"
-bun add --offline --ignore-scripts --cwd "$APERTURE_RUNTIME" /absolute/bridge.tgz
+bun add --ignore-scripts --exact --cwd "$APERTURE_RUNTIME" @jaxxstorm/bun-tailscale-bridge@0.1.0
 ```
 
-Use a new dedicated directory for this example so its private package metadata does not overwrite an existing project. Installing this bridge trusts executable JavaScript and native helpers with your user permissions. The plugin does not automatically download, install, or upgrade the bridge or runtime.
+Use external Bun **1.4.2** and a new dedicated directory for this example so its private package metadata does not overwrite an existing project. Installing this bridge trusts executable JavaScript and native helpers with your user permissions. The package manager normally installs the optional bridge; setup itself does not download, install, or upgrade the bridge or Bun.
 
 1. Install external Bun **1.4.2** yourself. Setup defaults to external mode, resolving `bun` from `PATH` to an absolute executable; an explicit absolute executable is also accepted. The worker checks its own Bun version. The currently embedded OpenCode runtime is rejected; the explicit OpenCode-executable option is reserved for a future verified runtime in that same worker process, with no fallback.
-2. Launch a local OpenCode server/TUI and run `/aperture-setup`. Confirm gateway trust, enter a trusted HTTPS origin, choose external Bun, and enter the absolute JS `modulePath`, for example `/absolute/user/runtime/node_modules/@jaxxstorm/bun-tailscale-bridge/dist/index.js`. For the installation above, use the expanded absolute value of `$APERTURE_RUNTIME/node_modules/@jaxxstorm/bun-tailscale-bridge/dist/index.js`, not a literal shell variable. A blank module path relies on package resolution and is not the supported unpublished local-tarball flow.
+2. Launch a local OpenCode server/TUI and run `/aperture-setup`. Confirm gateway trust, enter a trusted HTTPS origin, and choose external Bun. Leave `modulePath` blank for the normal registered-package installation. Only for a separate runtime or explicit trusted override, enter an absolute JS path; for the installation above, use the expanded absolute value of `$APERTURE_RUNTIME/node_modules/@jaxxstorm/bun-tailscale-bridge/dist/index.js`, not a literal shell variable.
 3. Choose browser enrollment or an `authKeyEnv` reference. When Tailscale supplies a new URL, it appears in a private prompt and the plugin attempts to open the default browser on macOS/Linux; repeated delivery of the same URL does not open it again. If that fails, copy the displayed URL manually. Keep the dialog open while authenticating; Enter keeps waiting and Escape cancels. The URL is passed directly to the OS opener as an argument, without a shell or diagnostic output; it is not saved in settings, chat, or plugin logs. This is an explicit exception to keeping enrollment URLs out of process arguments, not an absolute privacy guarantee against OS process inspection or browser history. For auth keys, enter only an environment variable **name**, such as `TS_AUTHKEY`; supply its value securely in the process environment before launching OpenCode. Never paste a key into a prompt or settings. Its value is not saved.
 4. After enrollment succeeds, setup closes the enrollment worker, cleans up, saves settings, and automatically refreshes models if the current local server instance is idle. Success is reported only after the native TUI provider state matches the rebuilt catalog. If refresh is busy or fails, enrollment and saved settings remain intact: finish active work and use `/aperture-models`, or restart OpenCode. Native OpenAI login is not required for selector visibility; it remains a separate inference step below. `/aperture-status` reports local saved settings, not live connectivity. `/aperture-disconnect` still disables the bridge on the next restart; it does not stop an already running worker, delete identity, or revoke the device remotely.
 
@@ -114,7 +123,7 @@ For direct mode, set a confirmed trusted gateway origin in the environment of th
 
 ```sh
 export APERTURE_HOST=https://aperture.example.com
-OPENCODE_APERTURE_ENABLE=1 opencode
+opencode
 ```
 
 `aperture.example.com` is a placeholder, not a provided service. Stop and restart all affected OpenCode processes after installation, manual configuration or host-environment changes, migration, or upgrades. Successful local enrollment now attempts the guarded refresh described above; `/aperture-models` can refresh the catalog manually. Discovery occurs at instance initialization/reload, not on every chat turn.
@@ -123,7 +132,6 @@ OPENCODE_APERTURE_ENABLE=1 opencode
 
 | Setting | Contract |
 | --- | --- |
-| `OPENCODE_APERTURE_ENABLE` | Only the exact value `1` enables server routing. Scope it to the selected process/profile, not global configuration. |
 | `APERTURE_HOST` | First nonempty host setting; takes precedence. |
 | `OPENCODE_APERTURE_HOST` | Used if `APERTURE_HOST` is empty or unset. |
 | Saved `bridge.gateway` | Used only when bridge mode is enabled and both host environment settings are empty or unset. |
@@ -178,9 +186,9 @@ An explicit default model is preserved. The legacy subscription path intersects 
 
 ### Verification Boundary
 
-Final installed synthetic checks passed: `--bridge-production-gateway` exercised four native protocols (Responses, Chat, Messages, Converse), including capability-protected routing and secret-free native config; `--bridge-production` passed all five subscription scenarios; `--bridge-production-refresh` passed catalog refresh. These runs include the fetch-boundary model-qualification change.
+Historical installed synthetic checks passed: `--bridge-production-gateway` exercised four native protocols (Responses, Chat, Messages, Converse), including capability-protected routing and secret-free native config; `--bridge-production` passed all five subscription scenarios; `--bridge-production-refresh` passed catalog refresh. These runs include the fetch-boundary model-qualification change, but do not verify the new release-readiness candidate.
 
-Final verification: 350 tests passed with pinned SDK probes enabled, 2,221 expectations across 17 files. Typecheck, build, package checks and strict OpenSpec validation passed. Launcher tests cover explicit environment forwarding and the 10-second shutdown grace, allowing up to seven seconds for bridge cleanup.
+Release-readiness verification: 363 tests passed with pinned SDK probes enabled, 2,253 expectations across 17 files. Typecheck, build, clean-consumer checks with the published bridge installed and omitted, and workflow lint passed. Package checks verify bridge import, native-helper metadata, worker resolution without an absolute module path, and server/TUI activation without an environment flag. They do not start a real helper or enroll a device. Hosted CI and publication remain separate owner-controlled steps.
 
 Evidence limits are separate from implementation completion: Gemini has passing SDK mock coverage only, not native OpenCode integration evidence. Live catalog discovery succeeded as recorded above, but catalog visibility and synthetic probes do not prove inference grants. **No live inference was performed**; live inference remains deferred and is not required to complete this change. Real interactive TUI/browser verification remains separate.
 
